@@ -7,12 +7,17 @@
 """
 
 from TTL import speak_cube, speak_cylinder, speak_sphere
+import time
 
 
 def main():
     # 只保留一行调用，按需把这里改成 speak_cube() 或 speak_cylinder()
-    speak_sphere()
-
+    speak_cube()
+    time.sleep(1.4)  # 等待播报完成，避免程序过早退出导致播报被中断
+    speak_cube()
+    time.sleep(1.4)
+    speak_cube()
+    time.sleep(1.4)
     # 如果你想一次测试三个，就改成下面三行：
     # speak_sphere()
     # speak_cube()

@@ -3,7 +3,7 @@ import time
 
 car = run()
 
-car.right_rotate()
+car.ahead()
 time.sleep(10)
 car.stop()
 

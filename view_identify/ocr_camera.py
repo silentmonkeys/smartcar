@@ -3,94 +3,81 @@
 import os
 import subprocess
 import sys
-import time
 from pathlib import Path
+
+def opencv_has_gui_support(cv2_module):
+	build_info = cv2_module.getBuildInformation()
+	for line in build_info.splitlines():
+		if line.strip().startswith("GUI:"):
+			upper_line = line.upper()
+			return "NO" not in upper_line and "NONE" not in upper_line
+	return False
 
 
 def ensure_opencv_runtime():
-	"""Switch to a runtime that can import cv2 and easyocr, preferring GUI when display exists."""
+	"""Switch to a known-good Python runtime if the current one cannot use OpenCV HighGUI."""
+	try:
+		import cv2
+
+		if opencv_has_gui_support(cv2):
+			return
+
+		current_runtime_lacks_gui = True
+	except Exception as exc:
+		current_runtime_lacks_gui = False
+		current_exception = exc
+
 	candidate_runtimes = (
 		"/home/jetson/yolov5_env/bin/python",
 		"/home/jetson/miniconda3/envs/car1/bin/python",
 	)
-	need_gui = bool(os.environ.get("DISPLAY") or os.environ.get("WAYLAND_DISPLAY"))
-
-	probe_script = r"""
-import re
-import sys
-
-require_gui = sys.argv[1] == "1"
-
-try:
-	import cv2  # noqa: F401
-	import numpy  # noqa: F401
-except Exception:
-	sys.exit(1)
-
-try:
-	import easyocr  # noqa: F401
-except Exception:
-	sys.exit(3)
-
-if not require_gui:
-	sys.exit(0)
-
-info = cv2.getBuildInformation()
-match = re.search(r"^\s*GUI:\s*(.+)$", info, re.MULTILINE)
-gui_backend = (match.group(1).strip().upper() if match else "")
-if gui_backend in ("", "NONE", "NO"):
-	sys.exit(2)
-
-sys.exit(0)
-"""
-
-	def probe_runtime(python_path):
-		return subprocess.run(
-			[python_path, "-c", probe_script, "1" if need_gui else "0"],
-			stdout=subprocess.DEVNULL,
-			stderr=subprocess.DEVNULL,
-			check=False,
-		).returncode
-
-	current_python = str(Path(sys.executable).resolve())
-	current_status = probe_runtime(current_python)
-	if current_status == 0:
-		return
-	if current_status == 2 and need_gui:
-		print("[WARN] Current OpenCV runtime lacks GUI backend. Trying fallback runtimes...")
-	if current_status == 3:
-		print("[WARN] Current Python runtime cannot import easyocr. Trying fallback runtimes...")
 
 	for candidate in candidate_runtimes:
 		if not (os.path.isfile(candidate) and os.access(candidate, os.X_OK)):
 			continue
 
-		candidate_real = str(Path(candidate).resolve())
-		if candidate_real == current_python:
-			continue
-
-		candidate_status = probe_runtime(candidate)
-		if candidate_status == 0:
-			print(f"[INFO] Switching to compatible Python runtime: {candidate}")
+		probe = subprocess.run(
+			[
+				candidate,
+				"-c",
+				"import sys\n"
+				"try:\n"
+				"    import cv2\n"
+				"    from ultralytics import YOLO  # noqa: F401\n"
+				"except Exception:\n"
+				"    sys.exit(1)\n"
+				"info = cv2.getBuildInformation()\n"
+				"sys.exit(0 if any(line.strip().startswith('GUI:') and 'NO' not in line.upper() and 'NONE' not in line.upper() for line in info.splitlines()) else 1)",
+			],
+			stdout=subprocess.DEVNULL,
+			stderr=subprocess.DEVNULL,
+			check=False,
+		)
+		if probe.returncode == 0:
+			print(f"[INFO] Switching to GUI-capable Python runtime: {candidate}")
 			os.execv(candidate, [candidate, str(Path(__file__).resolve()), *sys.argv[1:]])
 
-	if current_status == 1:
+	if current_runtime_lacks_gui:
 		raise RuntimeError(
-			"OpenCV import failed in the current Python runtime, and no compatible fallback runtime was found."
+			"OpenCV is available, but the current Python runtime does not include GUI window support. "
+			"A GUI-capable runtime was not found in the configured candidates."
 		)
 
-	if current_status == 2 and need_gui:
-		print("[WARN] Current OpenCV runtime lacks GUI backend. Falling back to headless OCR mode.")
-
-	if current_status == 3:
-		raise RuntimeError(
-			"easyocr is not available in the current Python runtime, and no compatible fallback runtime was found."
-		)
+	raise RuntimeError(
+		"OpenCV import failed in the current Python runtime. "
+		"A compatible runtime is available at /home/jetson/yolov5_env/bin/python."
+	) from current_exception
 
 
 ensure_opencv_runtime()
 
 import cv2
+from ultralytics import YOLO
+
+
+SCRIPT_DIR = Path(__file__).resolve().parent
+MODEL_PATH = SCRIPT_DIR / "best.pt"
+WINDOW_NAME = "OCR Camera Detection"
 
 
 def open_camera(preferred_indexes=range(5), configurations=((1280, 720, 30), (640, 480, 30), (1920, 1080, 30))):
@@ -134,52 +121,19 @@ def has_graphical_display():
 	return bool(os.environ.get("DISPLAY") or os.environ.get("WAYLAND_DISPLAY"))
 
 
-def has_opencv_highgui():
-	"""Check whether current OpenCV build supports GUI windows."""
-	try:
-		cv2.namedWindow("__highgui_test__", cv2.WINDOW_NORMAL)
-		cv2.destroyWindow("__highgui_test__")
-		return True
-	except cv2.error:
-		return False
-
-
-def build_reader():
-	try:
-		import easyocr
-	except ImportError:
-		print("[ERROR] easyocr not found.")
-		print("Please install with:")
-		print(f"  {sys.executable} -m pip install easyocr")
-		sys.exit(1)
-
-	try:
-		return easyocr.Reader(["ch_sim", "en"], gpu=False)
-	except Exception as exc:
-		print(f"[ERROR] Failed to initialize EasyOCR: {exc}")
-		sys.exit(1)
-
-
-def draw_ocr_results(frame, results, min_confidence=0.30):
-	for item in results:
-		if len(item) != 3:
-			continue
-		bbox, text, conf = item
-		if conf < min_confidence:
-			continue
-
-		points = [(int(p[0]), int(p[1])) for p in bbox]
-		for i in range(len(points)):
-			cv2.line(frame, points[i], points[(i + 1) % len(points)], (0, 255, 0), 2)
-
-		x = max(0, points[0][0])
-		y = max(20, points[0][1] - 10)
-		label = f"{text} ({conf:.2f})"
-		cv2.putText(frame, label, (x, y), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
+def load_model():
+	if not MODEL_PATH.exists():
+		raise FileNotFoundError(f"Model file not found: {MODEL_PATH}")
+	return YOLO(str(MODEL_PATH))
 
 
 def main():
-	print("Initializing Astra OCR Camera...")
+	print("Initializing OCR camera viewer...")
+
+	if not has_graphical_display():
+		print("Error: No graphical display was detected.")
+		print("Run this script from a desktop session with DISPLAY or WAYLAND_DISPLAY set.")
+		sys.exit(1)
 
 	try:
 		cap = open_camera()
@@ -191,20 +145,14 @@ def main():
 		print("3. Camera is not being used by another application")
 		sys.exit(1)
 
-	reader = build_reader()
-	print("[INFO] EasyOCR loaded.")
+	try:
+		model = load_model()
+	except Exception as exc:
+		print(f"Error loading model: {exc}")
+		cap.release()
+		sys.exit(1)
 
-	preview_enabled = has_graphical_display() and has_opencv_highgui()
-	if preview_enabled:
-		print("Press 'q' to quit")
-	else:
-		print("[WARN] OpenCV GUI is unavailable in current environment; running in headless OCR mode.")
-		print("[INFO] Press Ctrl+C to quit")
-
-	last_ocr_time = 0.0
-	ocr_interval_seconds = 1.0
-	latest_results = []
-	latest_texts = []
+	print("Press 'q' to quit")
 
 	try:
 		while True:
@@ -213,45 +161,17 @@ def main():
 				print("Error: Could not read frame.")
 				break
 
-			now = time.time()
-			if now - last_ocr_time >= ocr_interval_seconds:
-				results = reader.readtext(frame)
-				filtered = [item for item in results if len(item) == 3 and item[2] >= 0.30]
+			results = model.predict(frame, verbose=False)
+			detected_frame = results[0].plot()
+			cv2.imshow(WINDOW_NAME, detected_frame)
 
-				current_texts = [item[1].strip() for item in filtered if item[1].strip()]
-				if current_texts != latest_texts:
-					if current_texts:
-						print("[OCR] " + " | ".join(current_texts))
-					else:
-						print("[OCR] (no text)")
-					latest_texts = current_texts
-
-				latest_results = filtered
-				last_ocr_time = now
-
-			if preview_enabled:
-				draw_ocr_results(frame, latest_results)
-				try:
-					cv2.imshow("Astra OCR View", frame)
-				except cv2.error:
-					print("[WARN] imshow failed; switching to headless OCR mode.")
-					preview_enabled = False
-					print("[INFO] Press Ctrl+C to quit")
-					continue
-
-				if cv2.waitKey(1) & 0xFF in (ord("q"), ord("Q")):
-					break
-	except KeyboardInterrupt:
-		print("\n[INFO] Stopped by user.")
+			if cv2.waitKey(1) & 0xFF in (ord('q'), ord('Q')):
+				break
 	finally:
 		cap.release()
-		if preview_enabled:
-			try:
-				cv2.destroyAllWindows()
-			except cv2.error:
-				pass
-		print("OCR viewer closed.")
+		cv2.destroyAllWindows()
+		print("Viewer closed.")
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
 	main()
