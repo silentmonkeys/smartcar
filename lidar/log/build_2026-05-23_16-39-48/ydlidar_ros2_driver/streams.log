@@ -1,0 +1,122 @@
+[0.028s] Invoking command in '/home/jetson/codedemmo/lidar/build/ydlidar_ros2_driver': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/home/jetson/yahboomcar_ros2_ws/yahboomcar_ws/install/yahboomcar_voice_ctrl:/home/jetson/yahboomcar_ros2_ws/yahboomcar_ws/install/yahboomcar_visual:/home/jetson/yahboomcar_ros2_ws/yahboomcar_ws/install/yahboomcar_rviz:/home/jetson/yahboomcar_ros2_ws/yahboomcar_ws/install/yahboomcar_nav:/home/jetson/yahboomcar_ros2_ws/yahboomcar_ws/install/yahboomcar_multi:/home/jetson/yahboomcar_ros2_ws/yahboomcar_ws/install/yahboomcar_mediapipe:/home/jetson/yahboomcar_ros2_ws/yahboomcar_ws/install/yahboomcar_linefollow:/home/jetson/yahboomcar_ros2_ws/yahboomcar_ws/install/yahboomcar_laser:/home/jetson/yahboomcar_ros2_ws/yahboomcar_ws/install/yahboomcar_description_x1:/home/jetson/yahboomcar_ros2_ws/yahboomcar_ws/install/yahboomcar_description:/home/jetson/yahboomcar_ros2_ws/yahboomcar_ws/install/yahboomcar_ctrl:/home/jetson/yahboomcar_ros2_ws/yahboomcar_ws/install/yahboomcar_bringup:/home/jetson/yahboomcar_ros2_ws/yahboomcar_ws/install/yahboomcar_astra:/home/jetson/yahboomcar_ros2_ws/yahboomcar_ws/install/yahboom_app_save_map:/home/jetson/yahboomcar_ros2_ws/yahboomcar_ws/install/laserscan_to_point_pulisher:/opt/ros/humble __trae_PS1=\n(TraeAI-6) \w [$?] $ /usr/bin/cmake /home/jetson/codedemmo/lidar/src/ydlidar_ros2_driver -DAMENT_CMAKE_SYMLINK_INSTALL=1 -DCMAKE_INSTALL_PREFIX=/home/jetson/codedemmo/lidar/install/ydlidar_ros2_driver
+[0.178s] -- The C compiler identification is GNU 11.4.0
+[0.282s] -- The CXX compiler identification is GNU 11.4.0
+[0.296s] -- Detecting C compiler ABI info
+[0.437s] -- Detecting C compiler ABI info - done
+[0.449s] -- Check for working C compiler: /usr/bin/cc - skipped
+[0.449s] -- Detecting C compile features
+[0.449s] -- Detecting C compile features - done
+[0.455s] -- Detecting CXX compiler ABI info
+[0.629s] -- Detecting CXX compiler ABI info - done
+[0.642s] -- Check for working CXX compiler: /usr/bin/c++ - skipped
+[0.642s] -- Detecting CXX compile features
+[0.643s] -- Detecting CXX compile features - done
+[0.710s] -- Found ament_cmake: 1.3.14 (/opt/ros/humble/share/ament_cmake/cmake)
+[1.679s] -- Found Python3: /usr/bin/python3 (found version "3.10.12") found components: Interpreter 
+[1.848s] -- Override CMake install command with custom implementation using symlinks instead of copying resources
+[2.057s] -- Found rclcpp: 16.0.19 (/opt/ros/humble/share/rclcpp/cmake)
+[2.240s] -- Found rosidl_generator_c: 3.1.8 (/opt/ros/humble/share/rosidl_generator_c/cmake)
+[2.261s] -- Found rosidl_adapter: 3.1.8 (/opt/ros/humble/share/rosidl_adapter/cmake)
+[2.289s] -- Found rosidl_generator_cpp: 3.1.8 (/opt/ros/humble/share/rosidl_generator_cpp/cmake)
+[2.372s] -- Using all available rosidl_typesupport_c: rosidl_typesupport_fastrtps_c;rosidl_typesupport_introspection_c
+[2.425s] -- Using all available rosidl_typesupport_cpp: rosidl_typesupport_fastrtps_cpp;rosidl_typesupport_introspection_cpp
+[2.570s] -- Found rmw_implementation_cmake: 6.1.2 (/opt/ros/humble/share/rmw_implementation_cmake/cmake)
+[2.583s] -- Found rmw_fastrtps_cpp: 6.2.10 (/opt/ros/humble/share/rmw_fastrtps_cpp/cmake)
+[2.801s] -- Found OpenSSL: /usr/lib/aarch64-linux-gnu/libcrypto.so (found version "3.0.2")  
+[2.864s] -- Found FastRTPS: /opt/ros/humble/include  
+[2.960s] -- Using RMW implementation 'rmw_fastrtps_cpp' as default
+[2.997s] -- Looking for pthread.h
+[3.154s] -- Looking for pthread.h - found
+[3.155s] -- Performing Test CMAKE_HAVE_LIBC_PTHREAD
+[3.310s] -- Performing Test CMAKE_HAVE_LIBC_PTHREAD - Success
+[3.312s] -- Found Threads: TRUE  
+[3.449s] -- Found sensor_msgs: 4.9.1 (/opt/ros/humble/share/sensor_msgs/cmake)
+[3.525s] -- Found visualization_msgs: 4.9.1 (/opt/ros/humble/share/visualization_msgs/cmake)
+[3.571s] -- Found std_srvs: 4.9.1 (/opt/ros/humble/share/std_srvs/cmake)
+[3.628s] -- Found ament_lint_auto: 0.12.15 (/opt/ros/humble/share/ament_lint_auto/cmake)
+[3.925s] -- Added test 'copyright' to check source files copyright and LICENSE
+[3.972s] -- Added test 'cppcheck' to perform static code analysis on C / C++ code
+[3.972s] -- Configured cppcheck include dirs: /home/jetson/codedemmo/lidar/src/ydlidar_ros2_driver/src
+[3.973s] -- Configured cppcheck exclude dirs and/or files: 
+[3.988s] -- Added test 'cpplint' to check C / C++ code against the Google style
+[3.988s] -- Configured cpplint exclude dirs and/or files: 
+[3.993s] -- Added test 'flake8' to check Python code syntax and style conventions
+[4.006s] -- Added test 'lint_cmake' to check CMake code style
+[4.010s] -- Added test 'pep257' to check Python code against some of the docstring style conventions in PEP 257
+[4.026s] -- Added test 'uncrustify' to check C / C++ code style
+[4.026s] -- Configured uncrustify additional arguments: 
+[4.030s] -- Added test 'xmllint' to check XML markup files
+[4.036s] -- Configuring done
+[4.065s] -- Generating done
+[4.077s] -- Build files have been written to: /home/jetson/codedemmo/lidar/build/ydlidar_ros2_driver
+[4.105s] Invoked command in '/home/jetson/codedemmo/lidar/build/ydlidar_ros2_driver' returned '0': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/home/jetson/yahboomcar_ros2_ws/yahboomcar_ws/install/yahboomcar_voice_ctrl:/home/jetson/yahboomcar_ros2_ws/yahboomcar_ws/install/yahboomcar_visual:/home/jetson/yahboomcar_ros2_ws/yahboomcar_ws/install/yahboomcar_rviz:/home/jetson/yahboomcar_ros2_ws/yahboomcar_ws/install/yahboomcar_nav:/home/jetson/yahboomcar_ros2_ws/yahboomcar_ws/install/yahboomcar_multi:/home/jetson/yahboomcar_ros2_ws/yahboomcar_ws/install/yahboomcar_mediapipe:/home/jetson/yahboomcar_ros2_ws/yahboomcar_ws/install/yahboomcar_linefollow:/home/jetson/yahboomcar_ros2_ws/yahboomcar_ws/install/yahboomcar_laser:/home/jetson/yahboomcar_ros2_ws/yahboomcar_ws/install/yahboomcar_description_x1:/home/jetson/yahboomcar_ros2_ws/yahboomcar_ws/install/yahboomcar_description:/home/jetson/yahboomcar_ros2_ws/yahboomcar_ws/install/yahboomcar_ctrl:/home/jetson/yahboomcar_ros2_ws/yahboomcar_ws/install/yahboomcar_bringup:/home/jetson/yahboomcar_ros2_ws/yahboomcar_ws/install/yahboomcar_astra:/home/jetson/yahboomcar_ros2_ws/yahboomcar_ws/install/yahboom_app_save_map:/home/jetson/yahboomcar_ros2_ws/yahboomcar_ws/install/laserscan_to_point_pulisher:/opt/ros/humble __trae_PS1=\n(TraeAI-6) \w [$?] $ /usr/bin/cmake /home/jetson/codedemmo/lidar/src/ydlidar_ros2_driver -DAMENT_CMAKE_SYMLINK_INSTALL=1 -DCMAKE_INSTALL_PREFIX=/home/jetson/codedemmo/lidar/install/ydlidar_ros2_driver
+[4.110s] Invoking command in '/home/jetson/codedemmo/lidar/build/ydlidar_ros2_driver': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/home/jetson/yahboomcar_ros2_ws/yahboomcar_ws/install/yahboomcar_voice_ctrl:/home/jetson/yahboomcar_ros2_ws/yahboomcar_ws/install/yahboomcar_visual:/home/jetson/yahboomcar_ros2_ws/yahboomcar_ws/install/yahboomcar_rviz:/home/jetson/yahboomcar_ros2_ws/yahboomcar_ws/install/yahboomcar_nav:/home/jetson/yahboomcar_ros2_ws/yahboomcar_ws/install/yahboomcar_multi:/home/jetson/yahboomcar_ros2_ws/yahboomcar_ws/install/yahboomcar_mediapipe:/home/jetson/yahboomcar_ros2_ws/yahboomcar_ws/install/yahboomcar_linefollow:/home/jetson/yahboomcar_ros2_ws/yahboomcar_ws/install/yahboomcar_laser:/home/jetson/yahboomcar_ros2_ws/yahboomcar_ws/install/yahboomcar_description_x1:/home/jetson/yahboomcar_ros2_ws/yahboomcar_ws/install/yahboomcar_description:/home/jetson/yahboomcar_ros2_ws/yahboomcar_ws/install/yahboomcar_ctrl:/home/jetson/yahboomcar_ros2_ws/yahboomcar_ws/install/yahboomcar_bringup:/home/jetson/yahboomcar_ros2_ws/yahboomcar_ws/install/yahboomcar_astra:/home/jetson/yahboomcar_ros2_ws/yahboomcar_ws/install/yahboom_app_save_map:/home/jetson/yahboomcar_ros2_ws/yahboomcar_ws/install/laserscan_to_point_pulisher:/opt/ros/humble __trae_PS1=\n(TraeAI-6) \w [$?] $ /usr/bin/cmake --build /home/jetson/codedemmo/lidar/build/ydlidar_ros2_driver -- -j6 -l6
+[4.231s] [ 25%] [32mBuilding CXX object CMakeFiles/ydlidar_ros2_driver_client.dir/src/ydlidar_ros2_driver_client.cpp.o[0m
+[4.231s] [ 50%] [32mBuilding CXX object CMakeFiles/ydlidar_ros2_driver_node.dir/src/ydlidar_ros2_driver_node.cpp.o[0m
+[9.546s] [01m[K/home/jetson/codedemmo/lidar/src/ydlidar_ros2_driver/src/ydlidar_ros2_driver_node.cpp:[m[K In lambda function:
+[9.546s] [01m[K/home/jetson/codedemmo/lidar/src/ydlidar_ros2_driver/src/ydlidar_ros2_driver_node.cpp:170:54:[m[K [01;35m[Kwarning: [m[Kunused parameter ‘[01m[Krequest_header[m[K’ [[01;35m[K]8;;https://gcc.gnu.org/onlinedocs/gcc/Warning-Options.html#index-Wunused-parameter-Wunused-parameter]8;;[m[K]
+[9.546s]   170 |     [&laser]([01;35m[Kconst std::shared_ptr<rmw_request_id_t> request_header[m[K,
+[9.546s]       |              [01;35m[K~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~[m[K
+[9.546s] [01m[K/home/jetson/codedemmo/lidar/src/ydlidar_ros2_driver/src/ydlidar_ros2_driver_node.cpp:171:56:[m[K [01;35m[Kwarning: [m[Kunused parameter ‘[01m[Kreq[m[K’ [[01;35m[K]8;;https://gcc.gnu.org/onlinedocs/gcc/Warning-Options.html#index-Wunused-parameter-Wunused-parameter]8;;[m[K]
+[9.546s]   171 |   [01;35m[Kconst std::shared_ptr<std_srvs::srv::Empty::Request> req[m[K,
+[9.546s]       |   [01;35m[K~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~[m[K
+[9.546s] [01m[K/home/jetson/codedemmo/lidar/src/ydlidar_ros2_driver/src/ydlidar_ros2_driver_node.cpp:172:51:[m[K [01;35m[Kwarning: [m[Kunused parameter ‘[01m[Kresponse[m[K’ [[01;35m[K]8;;https://gcc.gnu.org/onlinedocs/gcc/Warning-Options.html#index-Wunused-parameter-Wunused-parameter]8;;[m[K]
+[9.547s]   172 |   [01;35m[Kstd::shared_ptr<std_srvs::srv::Empty::Response> response[m[K) -> bool
+[9.547s]       |   [01;35m[K~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~[m[K
+[9.578s] [01m[K/home/jetson/codedemmo/lidar/src/ydlidar_ros2_driver/src/ydlidar_ros2_driver_node.cpp:[m[K In lambda function:
+[9.578s] [01m[K/home/jetson/codedemmo/lidar/src/ydlidar_ros2_driver/src/ydlidar_ros2_driver_node.cpp:180:54:[m[K [01;35m[Kwarning: [m[Kunused parameter ‘[01m[Krequest_header[m[K’ [[01;35m[K]8;;https://gcc.gnu.org/onlinedocs/gcc/Warning-Options.html#index-Wunused-parameter-Wunused-parameter]8;;[m[K]
+[9.578s]   180 |     [&laser]([01;35m[Kconst std::shared_ptr<rmw_request_id_t> request_header[m[K,
+[9.578s]       |              [01;35m[K~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~[m[K
+[9.578s] [01m[K/home/jetson/codedemmo/lidar/src/ydlidar_ros2_driver/src/ydlidar_ros2_driver_node.cpp:181:56:[m[K [01;35m[Kwarning: [m[Kunused parameter ‘[01m[Kreq[m[K’ [[01;35m[K]8;;https://gcc.gnu.org/onlinedocs/gcc/Warning-Options.html#index-Wunused-parameter-Wunused-parameter]8;;[m[K]
+[9.578s]   181 |   [01;35m[Kconst std::shared_ptr<std_srvs::srv::Empty::Request> req[m[K,
+[9.578s]       |   [01;35m[K~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~[m[K
+[9.579s] [01m[K/home/jetson/codedemmo/lidar/src/ydlidar_ros2_driver/src/ydlidar_ros2_driver_node.cpp:182:51:[m[K [01;35m[Kwarning: [m[Kunused parameter ‘[01m[Kresponse[m[K’ [[01;35m[K]8;;https://gcc.gnu.org/onlinedocs/gcc/Warning-Options.html#index-Wunused-parameter-Wunused-parameter]8;;[m[K]
+[9.579s]   182 |   [01;35m[Kstd::shared_ptr<std_srvs::srv::Empty::Response> response[m[K) -> bool
+[9.579s]       |   [01;35m[K~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~[m[K
+[9.591s] [01m[K/home/jetson/codedemmo/lidar/src/ydlidar_ros2_driver/src/ydlidar_ros2_driver_node.cpp:[m[K In function ‘[01m[Kint main(int, char**)[m[K’:
+[9.591s] [01m[K/home/jetson/codedemmo/lidar/src/ydlidar_ros2_driver/src/ydlidar_ros2_driver_node.cpp:230:16:[m[K [01;35m[Kwarning: [m[Kunused variable ‘[01m[Kangle_deg[m[K’ [[01;35m[K]8;;https://gcc.gnu.org/onlinedocs/gcc/Warning-Options.html#index-Wunused-variable-Wunused-variable]8;;[m[K]
+[9.591s]   230 |         double [01;35m[Kangle_deg[m[K = scan.points[i].angle * 180.0 / M_PI;
+[9.591s]       |                [01;35m[K^~~~~~~~~[m[K
+[16.353s] [ 75%] [32m[1mLinking CXX executable ydlidar_ros2_driver_node[0m
+[16.967s] [ 75%] Built target ydlidar_ros2_driver_node
+[21.338s] [100%] [32m[1mLinking CXX executable ydlidar_ros2_driver_client[0m
+[22.098s] [100%] Built target ydlidar_ros2_driver_client
+[22.132s] Invoked command in '/home/jetson/codedemmo/lidar/build/ydlidar_ros2_driver' returned '0': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/home/jetson/yahboomcar_ros2_ws/yahboomcar_ws/install/yahboomcar_voice_ctrl:/home/jetson/yahboomcar_ros2_ws/yahboomcar_ws/install/yahboomcar_visual:/home/jetson/yahboomcar_ros2_ws/yahboomcar_ws/install/yahboomcar_rviz:/home/jetson/yahboomcar_ros2_ws/yahboomcar_ws/install/yahboomcar_nav:/home/jetson/yahboomcar_ros2_ws/yahboomcar_ws/install/yahboomcar_multi:/home/jetson/yahboomcar_ros2_ws/yahboomcar_ws/install/yahboomcar_mediapipe:/home/jetson/yahboomcar_ros2_ws/yahboomcar_ws/install/yahboomcar_linefollow:/home/jetson/yahboomcar_ros2_ws/yahboomcar_ws/install/yahboomcar_laser:/home/jetson/yahboomcar_ros2_ws/yahboomcar_ws/install/yahboomcar_description_x1:/home/jetson/yahboomcar_ros2_ws/yahboomcar_ws/install/yahboomcar_description:/home/jetson/yahboomcar_ros2_ws/yahboomcar_ws/install/yahboomcar_ctrl:/home/jetson/yahboomcar_ros2_ws/yahboomcar_ws/install/yahboomcar_bringup:/home/jetson/yahboomcar_ros2_ws/yahboomcar_ws/install/yahboomcar_astra:/home/jetson/yahboomcar_ros2_ws/yahboomcar_ws/install/yahboom_app_save_map:/home/jetson/yahboomcar_ros2_ws/yahboomcar_ws/install/laserscan_to_point_pulisher:/opt/ros/humble __trae_PS1=\n(TraeAI-6) \w [$?] $ /usr/bin/cmake --build /home/jetson/codedemmo/lidar/build/ydlidar_ros2_driver -- -j6 -l6
+[22.159s] Invoking command in '/home/jetson/codedemmo/lidar/build/ydlidar_ros2_driver': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/home/jetson/yahboomcar_ros2_ws/yahboomcar_ws/install/yahboomcar_voice_ctrl:/home/jetson/yahboomcar_ros2_ws/yahboomcar_ws/install/yahboomcar_visual:/home/jetson/yahboomcar_ros2_ws/yahboomcar_ws/install/yahboomcar_rviz:/home/jetson/yahboomcar_ros2_ws/yahboomcar_ws/install/yahboomcar_nav:/home/jetson/yahboomcar_ros2_ws/yahboomcar_ws/install/yahboomcar_multi:/home/jetson/yahboomcar_ros2_ws/yahboomcar_ws/install/yahboomcar_mediapipe:/home/jetson/yahboomcar_ros2_ws/yahboomcar_ws/install/yahboomcar_linefollow:/home/jetson/yahboomcar_ros2_ws/yahboomcar_ws/install/yahboomcar_laser:/home/jetson/yahboomcar_ros2_ws/yahboomcar_ws/install/yahboomcar_description_x1:/home/jetson/yahboomcar_ros2_ws/yahboomcar_ws/install/yahboomcar_description:/home/jetson/yahboomcar_ros2_ws/yahboomcar_ws/install/yahboomcar_ctrl:/home/jetson/yahboomcar_ros2_ws/yahboomcar_ws/install/yahboomcar_bringup:/home/jetson/yahboomcar_ros2_ws/yahboomcar_ws/install/yahboomcar_astra:/home/jetson/yahboomcar_ros2_ws/yahboomcar_ws/install/yahboom_app_save_map:/home/jetson/yahboomcar_ros2_ws/yahboomcar_ws/install/laserscan_to_point_pulisher:/opt/ros/humble __trae_PS1=\n(TraeAI-6) \w [$?] $ /usr/bin/cmake --install /home/jetson/codedemmo/lidar/build/ydlidar_ros2_driver
+[22.175s] -- Install configuration: ""
+[22.176s] -- Execute custom install script
+[22.176s] -- Symlinking: /home/jetson/codedemmo/lidar/install/ydlidar_ros2_driver/lib/ydlidar_ros2_driver/ydlidar_ros2_driver_node
+[22.194s] -- Symlinking: /home/jetson/codedemmo/lidar/install/ydlidar_ros2_driver/lib/ydlidar_ros2_driver/ydlidar_ros2_driver_client
+[22.213s] -- Symlinking: /home/jetson/codedemmo/lidar/install/ydlidar_ros2_driver/share/ydlidar_ros2_driver/launch/ydlidar.py
+[22.230s] -- Symlinking: /home/jetson/codedemmo/lidar/install/ydlidar_ros2_driver/share/ydlidar_ros2_driver/launch/ydlidar_launch.py
+[22.249s] -- Symlinking: /home/jetson/codedemmo/lidar/install/ydlidar_ros2_driver/share/ydlidar_ros2_driver/launch/ydlidar_launch_view.py
+[22.268s] -- Symlinking: /home/jetson/codedemmo/lidar/install/ydlidar_ros2_driver/share/ydlidar_ros2_driver/launch/ydlidar_raw_launch.py
+[22.291s] -- Symlinking: /home/jetson/codedemmo/lidar/install/ydlidar_ros2_driver/share/ydlidar_ros2_driver/params/G1.yaml
+[22.310s] -- Symlinking: /home/jetson/codedemmo/lidar/install/ydlidar_ros2_driver/share/ydlidar_ros2_driver/params/G2.yaml
+[22.329s] -- Symlinking: /home/jetson/codedemmo/lidar/install/ydlidar_ros2_driver/share/ydlidar_ros2_driver/params/G6.yaml
+[22.351s] -- Symlinking: /home/jetson/codedemmo/lidar/install/ydlidar_ros2_driver/share/ydlidar_ros2_driver/params/GS2.yaml
+[22.371s] -- Symlinking: /home/jetson/codedemmo/lidar/install/ydlidar_ros2_driver/share/ydlidar_ros2_driver/params/TEA.yaml
+[22.394s] -- Symlinking: /home/jetson/codedemmo/lidar/install/ydlidar_ros2_driver/share/ydlidar_ros2_driver/params/TG.yaml
+[22.416s] -- Symlinking: /home/jetson/codedemmo/lidar/install/ydlidar_ros2_driver/share/ydlidar_ros2_driver/params/TminiPro.yaml
+[22.435s] -- Symlinking: /home/jetson/codedemmo/lidar/install/ydlidar_ros2_driver/share/ydlidar_ros2_driver/params/X2.yaml
+[22.455s] -- Symlinking: /home/jetson/codedemmo/lidar/install/ydlidar_ros2_driver/share/ydlidar_ros2_driver/params/X4-Pro.yaml
+[22.480s] -- Symlinking: /home/jetson/codedemmo/lidar/install/ydlidar_ros2_driver/share/ydlidar_ros2_driver/params/X4.yaml
+[22.502s] -- Symlinking: /home/jetson/codedemmo/lidar/install/ydlidar_ros2_driver/share/ydlidar_ros2_driver/params/ydlidar.yaml
+[22.526s] -- Symlinking: /home/jetson/codedemmo/lidar/install/ydlidar_ros2_driver/share/ydlidar_ros2_driver/startup/initenv.sh
+[22.550s] -- Symlinking: /home/jetson/codedemmo/lidar/install/ydlidar_ros2_driver/share/ydlidar_ros2_driver/config/ydlidar.rviz
+[22.573s] -- Symlinking: /home/jetson/codedemmo/lidar/install/ydlidar_ros2_driver/share/ament_index/resource_index/package_run_dependencies/ydlidar_ros2_driver
+[22.597s] -- Symlinking: /home/jetson/codedemmo/lidar/install/ydlidar_ros2_driver/share/ament_index/resource_index/parent_prefix_path/ydlidar_ros2_driver
+[22.620s] -- Symlinking: /home/jetson/codedemmo/lidar/install/ydlidar_ros2_driver/share/ydlidar_ros2_driver/environment/ament_prefix_path.sh
+[22.646s] -- Symlinking: /home/jetson/codedemmo/lidar/install/ydlidar_ros2_driver/share/ydlidar_ros2_driver/environment/ament_prefix_path.dsv
+[22.669s] -- Symlinking: /home/jetson/codedemmo/lidar/install/ydlidar_ros2_driver/share/ydlidar_ros2_driver/environment/path.sh
+[22.693s] -- Symlinking: /home/jetson/codedemmo/lidar/install/ydlidar_ros2_driver/share/ydlidar_ros2_driver/environment/path.dsv
+[22.716s] -- Symlinking: /home/jetson/codedemmo/lidar/install/ydlidar_ros2_driver/share/ydlidar_ros2_driver/local_setup.bash
+[22.740s] -- Symlinking: /home/jetson/codedemmo/lidar/install/ydlidar_ros2_driver/share/ydlidar_ros2_driver/local_setup.sh
+[22.762s] -- Symlinking: /home/jetson/codedemmo/lidar/install/ydlidar_ros2_driver/share/ydlidar_ros2_driver/local_setup.zsh
+[22.786s] -- Symlinking: /home/jetson/codedemmo/lidar/install/ydlidar_ros2_driver/share/ydlidar_ros2_driver/local_setup.dsv
+[22.806s] -- Symlinking: /home/jetson/codedemmo/lidar/install/ydlidar_ros2_driver/share/ydlidar_ros2_driver/package.dsv
+[22.827s] -- Symlinking: /home/jetson/codedemmo/lidar/install/ydlidar_ros2_driver/share/ament_index/resource_index/packages/ydlidar_ros2_driver
+[22.850s] -- Symlinking: /home/jetson/codedemmo/lidar/install/ydlidar_ros2_driver/share/ydlidar_ros2_driver/cmake/ydlidar_ros2_driverConfig.cmake
+[22.873s] -- Symlinking: /home/jetson/codedemmo/lidar/install/ydlidar_ros2_driver/share/ydlidar_ros2_driver/cmake/ydlidar_ros2_driverConfig-version.cmake
+[22.897s] -- Symlinking: /home/jetson/codedemmo/lidar/install/ydlidar_ros2_driver/share/ydlidar_ros2_driver/package.xml
+[22.927s] Invoked command in '/home/jetson/codedemmo/lidar/build/ydlidar_ros2_driver' returned '0': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/home/jetson/yahboomcar_ros2_ws/yahboomcar_ws/install/yahboomcar_voice_ctrl:/home/jetson/yahboomcar_ros2_ws/yahboomcar_ws/install/yahboomcar_visual:/home/jetson/yahboomcar_ros2_ws/yahboomcar_ws/install/yahboomcar_rviz:/home/jetson/yahboomcar_ros2_ws/yahboomcar_ws/install/yahboomcar_nav:/home/jetson/yahboomcar_ros2_ws/yahboomcar_ws/install/yahboomcar_multi:/home/jetson/yahboomcar_ros2_ws/yahboomcar_ws/install/yahboomcar_mediapipe:/home/jetson/yahboomcar_ros2_ws/yahboomcar_ws/install/yahboomcar_linefollow:/home/jetson/yahboomcar_ros2_ws/yahboomcar_ws/install/yahboomcar_laser:/home/jetson/yahboomcar_ros2_ws/yahboomcar_ws/install/yahboomcar_description_x1:/home/jetson/yahboomcar_ros2_ws/yahboomcar_ws/install/yahboomcar_description:/home/jetson/yahboomcar_ros2_ws/yahboomcar_ws/install/yahboomcar_ctrl:/home/jetson/yahboomcar_ros2_ws/yahboomcar_ws/install/yahboomcar_bringup:/home/jetson/yahboomcar_ros2_ws/yahboomcar_ws/install/yahboomcar_astra:/home/jetson/yahboomcar_ros2_ws/yahboomcar_ws/install/yahboom_app_save_map:/home/jetson/yahboomcar_ros2_ws/yahboomcar_ws/install/laserscan_to_point_pulisher:/opt/ros/humble __trae_PS1=\n(TraeAI-6) \w [$?] $ /usr/bin/cmake --install /home/jetson/codedemmo/lidar/build/ydlidar_ros2_driver

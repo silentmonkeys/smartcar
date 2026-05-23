@@ -7,25 +7,25 @@ class run:
     """
     def __init__(self):
         self._rosmaster = Rosmaster()
-
+    #前进
     def ahead(self):
         self._rosmaster.set_car_motion(0.5, 0.0, 0)
-
+    #后退
     def back(self):
         self._rosmaster.set_car_motion(-0.5, 0.0, 0)
-
+    #左转
     def left(self):
         self._rosmaster.set_car_motion(0.5, 0.0, 0.2)
-
+    #右转
     def right(self):
         self._rosmaster.set_car_motion(0.5, 0.0, -0.2)
-
+    #左转原地旋转
     def left_rotate(self):
         self._rosmaster.set_car_motion(0.0, 0.0, 0.6) 
-
+    #右转原地旋转
     def right_rotate(self):
         self._rosmaster.set_car_motion(0.0, 0.0, -0.6)
-
+    #停止
     def stop(self):
         self._rosmaster.set_car_motion(0.0, 0.0, 0)
 
