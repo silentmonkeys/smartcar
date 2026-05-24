@@ -4,7 +4,7 @@ import time
 car = run()
 
 car.ahead()
-time.sleep(10)
+time.sleep(5)
 car.stop()
 
 
