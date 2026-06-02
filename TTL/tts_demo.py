@@ -22,7 +22,7 @@ class ShapeVoiceTrigger:
 	协议帧固定为: AA 55 FF <命令字> FB
 	"""
 
-	DEFAULT_PORT = "/dev/ttyUSB2"
+	DEFAULT_PORT = "/dev/myspeech"
 	DEFAULT_BAUDRATE = 115200
 
 	SHAPE_CODES = {
