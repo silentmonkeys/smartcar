@@ -26,7 +26,7 @@ roslaunch yahboomcar_nav rrt_exploration.launch use_rviz:=false
 roslaunch yahboomcar_ctrl yahboom_keyboard.launch
 
 b5d9b57a4ac5
-e16553ebf884 
+e16553ebf884
+36082cc3b06a
 
-docker exec -it e16553ebf884 /bin/bash
-
+docker exec -it 36082cc3b06a /bin/bash
