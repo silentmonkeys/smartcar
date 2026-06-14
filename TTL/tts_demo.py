@@ -22,8 +22,9 @@ class ShapeVoiceTrigger:
 	协议帧固定为: AA 55 FF <命令字> FB
 	"""
 
-	DEFAULT_PORT = "/dev/myspeech"
+	DEFAULT_PORT = "/dev/ttyUSB2"
 	DEFAULT_BAUDRATE = 115200
+	INIT_CODE = 0x67
 
 	SHAPE_CODES = {
 		"sphere": 0x3D,
@@ -71,6 +72,10 @@ class ShapeVoiceTrigger:
 		time.sleep(0.005)
 		return frame
 
+	def send_init(self):
+		"""先发送一次初始化帧，兼容旧版模块流程。"""
+		return self.send_command(self.INIT_CODE)
+
 	def trigger_shape(self, shape_name):
 		if shape_name not in self.SHAPE_CODES:
 			valid = ", ".join(sorted(self.SHAPE_CODES))
@@ -90,12 +95,15 @@ class ShapeVoiceTrigger:
 def send_shape_trigger(shape_name, port=ShapeVoiceTrigger.DEFAULT_PORT, baudrate=ShapeVoiceTrigger.DEFAULT_BAUDRATE, timeout=1):
 	"""单次发送一个播报触发，适合在其他代码里直接调用。"""
 	with ShapeVoiceTrigger(port=port, baudrate=baudrate, timeout=timeout) as trigger:
+		trigger.send_init()
 		return trigger.trigger_shape(shape_name)
 
 
 def run_demo(shape_name=None):
 	with ShapeVoiceTrigger() as trigger:
 		print(f"Speech serial opened on {trigger.port} at {trigger.baudrate}")
+		init_frame = trigger.send_init()
+		print(f"Sent init: {init_frame.hex(' ')}")
 
 		if shape_name:
 			frame = trigger.trigger_shape(shape_name)

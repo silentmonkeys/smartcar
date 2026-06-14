@@ -88,7 +88,7 @@ import easyocr
 from ultralytics import YOLO
 
 
-MODEL_PATH = Path("/home/jetson/codedemmo/view_identify/best.pt")
+MODEL_PATH = Path("best.pt")
 CAMERA_DEVICE = "/dev/camera_depth"
 WINDOW_NAME = "OCR Camera Detection"
 OCR_LANGS = ["ch_sim", "en"]
