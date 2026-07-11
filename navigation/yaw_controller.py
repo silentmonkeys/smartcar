@@ -1,3 +1,4 @@
+import rospy
 from dynamic_reconfigure.client import Client as DynClient
 
 
