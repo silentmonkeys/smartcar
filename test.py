@@ -70,6 +70,7 @@ ROS_IMAGE_TOPIC = "/usb_cam/image_raw"
 OCR_LANGS = ["ch_sim", "en"]
 OCR_MIN_CONFIDENCE = 0.35
 TEXT_CLASS_NAME = "text"
+OBJECT_CLASSES = ["cube", "sphere", "cylinder"]  # 物体类别
 
 # OCR结果稳定性参数
 RESULT_HISTORY_SIZE = 5
@@ -362,68 +363,213 @@ def send_goal(action_client, x, y, oz, ow):
     return action_client.get_state() == actionlib.GoalStatus.SUCCEEDED
 
 # ========== 视觉任务核心函数 ==========
-def capture_and_detect_objects(model):
+def detect_objects_and_build_mapping(model, reader, subscriber, action_functions):
     """
-    倒数第二个路径点任务：捕获一帧，检测cube/sphere/cylinder，
-    按X轴中心坐标从左到右排序，返回检测结果列表。
+    在最后一个点位实时检测物体并建立映射。
+    持续检测直到同时满足两个条件：
+    1) 检测到物体（cube/sphere/cylinder）
+    2) 识别到文本标签（与白名单匹配）
+    
+    一旦检测到文本标签，立即冻结映射并返回。
+    如果此时检测不完整（被文本板遮挡），使用最近一次完整检测的映射。
+    
+    返回: (complete_order_list, label_to_action_dict) 或 None表示失败
     """
-    rospy.loginfo("从话题 %s 捕获图像...", ROS_IMAGE_TOPIC)
-    frame = capture_ros_image(timeout=5.0)
-    if frame is None:
-        rospy.logerr("无法获取图像")
-        return []
-    results = model.predict(frame, verbose=False)
-    detected = detect_boxes(results[0], target_labels=["cube", "sphere", "cylinder"])
-    # 按 X 轴位置从左到右排序
-    detected.sort(key=lambda d: d["x_center"])
-    order = [d["label"] for d in detected]
-    rospy.loginfo("检测到的物体（左→右）: %s", order)
-    rospy.loginfo("各物体X中心坐标: %s", [f"{d['label']}: {d['x_center']:.1f}" for d in detected])
-    return detected
+    rospy.loginfo("=== 开始实时检测物体并建立映射 ===")
+    
+    # OCR历史记录
+    ocr_history = []
+    last_ocr_time = 0.0
+    last_detection_box = None
+    last_text_time = time.monotonic()
+    
+    # 当前的物体检测结果（持续更新直到文本确认）
+    current_detected_order = None
+    
+    # 保存最后一次完整检测（3个物体）的映射
+    last_complete_order = None
+    last_complete_label_to_action = None
+    
+    while not should_stop():
+        frame = subscriber.get_frame()
+        if frame is None:
+            rospy.sleep(0.05)
+            continue
+        
+        results = model.predict(frame, verbose=False)
+        now = time.monotonic()
+        
+        # 1) 检测物体（cube/sphere/cylinder）
+        object_boxes = detect_boxes(results[0], target_labels=OBJECT_CLASSES, min_confidence=0.35)
+        
+        # 2) 检测文本框
+        text_boxes = detect_boxes(results[0], target_labels=[TEXT_CLASS_NAME.lower()],
+                                  min_confidence=OCR_MIN_CONFIDENCE)
+        
+        # ===== 更新物体检测结果 =====
+        if object_boxes:
+            # 按 X 轴位置从左到右排序
+            object_boxes.sort(key=lambda d: d["x_center"])
+            detected_order = [obj["label"] for obj in object_boxes]
+            
+            # 记录检测到的物体
+            if detected_order != current_detected_order:
+                current_detected_order = detected_order
+                order_cn = [YOLO_TO_CHINESE.get(l, l) for l in detected_order]
+                
+                if len(detected_order) == 3:
+                    # 检测到完整的3个物体，更新"最后完整映射"
+                    chinese_labels = [YOLO_TO_CHINESE.get(l, l) for l in detected_order]
+                    
+                    # 创建完整映射
+                    last_complete_label_to_action = {}
+                    for i, ch in enumerate(chinese_labels):
+                        if i == 0:
+                            last_complete_label_to_action[ch] = action_functions[1]  # 最左 → 左转
+                        elif i == 1:
+                            last_complete_label_to_action[ch] = action_functions[0]  # 中间 → 前进
+                        elif i == 2:
+                            last_complete_label_to_action[ch] = action_functions[2]  # 最右 → 右转
+                    
+                    last_complete_order = detected_order
+                    rospy.loginfo("[物体检测] 完整检测到3个物体（左→右）: %s (已保存)", order_cn)
+                    rospy.loginfo("[物体检测] 当前映射关系:")
+                    for ch, act in last_complete_label_to_action.items():
+                        rospy.loginfo("  %s → %s", ch, act.__name__)
+                else:
+                    # 检测不完整（可能被文本板遮挡）
+                    rospy.loginfo("[物体检测] 检测到 %d 个物体（左→右）: %s", len(detected_order), order_cn)
+                    if last_complete_order:
+                        rospy.loginfo("[物体检测] 检测不完整，将使用最近一次完整检测: %s", 
+                                     [YOLO_TO_CHINESE.get(l, l) for l in last_complete_order])
+        
+        # ===== OCR文本识别 =====
+        if text_boxes and (now - last_ocr_time) >= 1.5:
+            best_box = text_boxes[0]
+            # 判断文本框是否移动，避免重复OCR
+            do_ocr = True
+            if last_detection_box is not None:
+                cx = (best_box["box"][0] + best_box["box"][2]) / 2
+                cy = (best_box["box"][1] + best_box["box"][3]) / 2
+                lx = (last_detection_box[0] + last_detection_box[2]) / 2
+                ly = (last_detection_box[1] + last_detection_box[3]) / 2
+                if ((cx - lx)**2 + (cy - ly)**2)**0.5 < BOX_CHANGE_THRESHOLD:
+                    do_ocr = False
+            
+            if do_ocr:
+                last_detection_box = best_box["box"]
+                crop, _ = crop_with_padding(frame, best_box["box"])
+                texts = recognize_text(reader, crop)
+                last_ocr_time = now
+                
+                if texts:
+                    texts.sort(key=lambda x: x[1], reverse=True)
+                    current_text = " ".join([t[0] for t in texts])
+                    current_conf = texts[0][1]
+                    ocr_history.append((current_text, current_conf))
+                    if len(ocr_history) > RESULT_HISTORY_SIZE:
+                        ocr_history.pop(0)
+                    
+                    consensus = get_consensus_result(ocr_history)
+                    if consensus:
+                        rospy.loginfo("[OCR检测] 共识文本: %s", consensus)
+                        # 匹配白名单
+                        for wl_item in WHITELIST:
+                            if text_similarity(consensus, wl_item) >= SIMILARITY_THRESHOLD:
+                                matched_label = wl_item
+                                rospy.loginfo("[OCR检测] 匹配到物体: %s，等待3秒确认...", matched_label)
+                                last_text_time = now
+                                
+                                # 等待3秒无新文本确认
+                                while not should_stop():
+                                    if time.monotonic() - last_text_time >= 3.0:
+                                        # 确认！冻结映射
+                                        rospy.loginfo("[映射冻结] 文本标签已确认，冻结映射")
+                                        
+                                        # 优先使用完整检测的映射
+                                        if last_complete_order and last_complete_label_to_action:
+                                            rospy.loginfo("[映射冻结] 使用最近一次完整检测的映射")
+                                            rospy.loginfo("[映射冻结] 完整顺序（左→右）: %s", 
+                                                         [YOLO_TO_CHINESE.get(l, l) for l in last_complete_order])
+                                            rospy.loginfo("[映射冻结] 最终映射关系:")
+                                            for ch, act in last_complete_label_to_action.items():
+                                                rospy.loginfo("  %s → %s", ch, act.__name__)
+                                            return last_complete_order, last_complete_label_to_action
+                                        
+                                        # 如果没有完整检测记录，使用当前检测结果
+                                        elif current_detected_order:
+                                            rospy.logwarn("[映射冻结] 没有完整检测记录，使用当前检测结果: %s", 
+                                                         [YOLO_TO_CHINESE.get(l, l) for l in current_detected_order])
+                                            # 创建当前映射
+                                            chinese_labels = [YOLO_TO_CHINESE.get(l, l) for l in current_detected_order]
+                                            label_to_action = {}
+                                            for i, ch in enumerate(chinese_labels):
+                                                if i == 0:
+                                                    label_to_action[ch] = action_functions[1]
+                                                elif i == 1:
+                                                    label_to_action[ch] = action_functions[0]
+                                                elif i == 2:
+                                                    label_to_action[ch] = action_functions[2]
+                                            return current_detected_order, label_to_action
+                                        
+                                        # 完全没有检测到物体
+                                        else:
+                                            rospy.logwarn("[映射冻结] 使用默认顺序")
+                                            default_order = ["cube", "sphere", "cylinder"]
+                                            chinese_labels = [YOLO_TO_CHINESE.get(l, l) for l in default_order]
+                                            label_to_action = {}
+                                            for i, ch in enumerate(chinese_labels):
+                                                if i == 0:
+                                                    label_to_action[ch] = action_functions[1]
+                                                elif i == 1:
+                                                    label_to_action[ch] = action_functions[0]
+                                                elif i == 2:
+                                                    label_to_action[ch] = action_functions[2]
+                                            return default_order, label_to_action
+                                    
+                                    rospy.sleep(0.1)
+                                break
+        
+        rospy.sleep(0.05)
+    
+    # 被停止信号中断
+    return None, None
 
-def process_last_waypoint(model, reader, detected_order, action_functions):
+def process_last_waypoint(model, reader, action_functions):
     """
-    最后一个路径点任务：循环执行 [实时 OCR 识别 → 导航到对应点位 → 语音播报]，
-    直到 Ctrl+C 关闭 ROS 或 /stop_loop topic 收到 True 才停止。
-
-    每一轮：
-      1) 持续 YOLO 找文本框 + EasyOCR 识别 + 多帧共识；
-      2) 共识文本与白名单匹配后，等待 3 秒无新文本以确认稳定；
-      3) 调用对应动作函数（go_to_xxx_waypoint），即导航到对应点位；
-      4) 播报语音（×3）；
-      5) 重置 OCR 状态，进入下一轮（继续在新位置上识别）。
-
-    识别失败（未匹配到白名单）时持续等待，不退出本轮 —— 行为与首次识别一致。
+    最后一个路径点任务：
+    1) 实时检测物体并建立映射（持续更新直到文本标签确认）
+    2) 映射冻结后，循环执行 [实时 OCR 识别 → 导航到对应点位 → 语音播报]
     """
-    # 根据检测顺序创建位置→动作的映射
-    # 假设 detected_order 是 [最左边物体, 中间物体, 最右边物体]
-    # 动作函数列表顺序为: [move_forward, move_left, move_right]
-    chinese_labels = [YOLO_TO_CHINESE.get(l, l) for l in detected_order]
-    label_to_action = {}
-    for i, ch in enumerate(chinese_labels):
-        if i == 0:
-            label_to_action[ch] = action_functions[1]  # 最左 → 左转
-        elif i == 1:
-            label_to_action[ch] = action_functions[0]  # 中间 → 前进
-        elif i == 2:
-            label_to_action[ch] = action_functions[2]  # 最右 → 右转
-
-    rospy.loginfo("=== 位置→动作映射 ===")
-    for ch, act in label_to_action.items():
-        rospy.loginfo(f"  {ch} → {act.__name__}")
-
-    # 初始化停止订阅器（双通道：Ctrl+C + /stop_loop）
+    # 初始化停止订阅器
     init_stop_subscriber()
-
     subscriber = ROSImageSubscriber()
     rospy.sleep(0.5)  # 等待订阅就绪
-
+    
     round_idx = 0
+    
     try:
+        # ===== 阶段1: 实时检测物体并建立映射 =====
+        rospy.loginfo("====== 阶段1: 实时检测物体，等待文本标签确认 ======")
+        complete_order, label_to_action = detect_objects_and_build_mapping(
+            model, reader, subscriber, action_functions
+        )
+        
+        if should_stop():
+            rospy.logwarn("映射建立过程中收到停止信号")
+            return
+        
+        if complete_order is None or label_to_action is None:
+            rospy.logerr("未能建立有效的物体映射，退出")
+            return
+        
+        rospy.loginfo("====== 映射已冻结，开始循环导航 ======")
+        
+        # ===== 阶段2: 循环OCR识别与导航 =====
         while not should_stop():
             round_idx += 1
             rospy.loginfo("====== 第 %d 轮 OCR 识别-导航循环开始 ======", round_idx)
-
+            
             # 每轮重置 OCR 状态
             ocr_history = []
             last_ocr_time = 0.0
@@ -431,19 +577,19 @@ def process_last_waypoint(model, reader, detected_order, action_functions):
             last_text_time = time.monotonic()
             has_executed = False
             matched_label = None
-
+            
             # —— 内层：实时 OCR 识别循环 ——
             while not should_stop():
                 frame = subscriber.get_frame()
                 if frame is None:
                     rospy.sleep(0.05)
                     continue
-
+                
                 results = model.predict(frame, verbose=False)
                 text_boxes = detect_boxes(results[0], target_labels=[TEXT_CLASS_NAME.lower()],
                                           min_confidence=OCR_MIN_CONFIDENCE)
                 now = time.monotonic()
-
+                
                 if text_boxes and (now - last_ocr_time) >= 1.5:
                     best_box = text_boxes[0]
                     # 判断文本框是否移动，避免重复OCR
@@ -455,7 +601,7 @@ def process_last_waypoint(model, reader, detected_order, action_functions):
                         ly = (last_detection_box[1] + last_detection_box[3]) / 2
                         if ((cx - lx)**2 + (cy - ly)**2)**0.5 < BOX_CHANGE_THRESHOLD:
                             do_ocr = False
-
+                    
                     if do_ocr:
                         last_detection_box = best_box["box"]
                         crop, _ = crop_with_padding(frame, best_box["box"])
@@ -468,7 +614,7 @@ def process_last_waypoint(model, reader, detected_order, action_functions):
                             ocr_history.append((current_text, current_conf))
                             if len(ocr_history) > RESULT_HISTORY_SIZE:
                                 ocr_history.pop(0)
-
+                            
                             consensus = get_consensus_result(ocr_history)
                             if consensus:
                                 rospy.loginfo("[第%d轮] OCR共识文本: %s", round_idx, consensus)
@@ -480,12 +626,12 @@ def process_last_waypoint(model, reader, detected_order, action_functions):
                                                       round_idx, matched_label)
                                         last_text_time = now
                                         break
-
+                
                 # 执行动作逻辑（每轮只执行一次，执行完后跳出内层循环进入下一轮）
                 if matched_label and not has_executed:
                     if now - last_text_time >= 3.0:
                         rospy.loginfo("[第%d轮] 3秒无新文本，执行动作: %s", round_idx, matched_label)
-                        # 1) 动作（导航到对应点位）
+                        # 1) 动作（导航到对应点位）—— 使用冻结的映射
                         if matched_label in label_to_action:
                             try:
                                 label_to_action[matched_label]()
@@ -494,7 +640,7 @@ def process_last_waypoint(model, reader, detected_order, action_functions):
                                 rospy.logerr("[第%d轮] 导航动作异常: %s", round_idx, e)
                         else:
                             rospy.logwarn("[第%d轮] 无动作映射: %s", round_idx, matched_label)
-
+                        
                         # 2) 语音播报（与动作解耦）
                         if matched_label in TEXT_TO_SPEECH:
                             speak_fn = TEXT_TO_SPEECH[matched_label]
@@ -506,34 +652,36 @@ def process_last_waypoint(model, reader, detected_order, action_functions):
                                 time.sleep(1.4)
                         else:
                             rospy.logwarn("[第%d轮] 无语音映射: %s", round_idx, matched_label)
-
+                        
                         has_executed = True
                         # 跳出内层循环，进入下一轮（在新位置继续识别）
                         break
-
+                
                 rospy.sleep(0.05)
-
+            
             # —— 内层结束：本轮已执行动作或被停止 ——
             if should_stop():
                 break
-
-            # 给图像帧、TF、OCR 一点缓冲时间，避免在新位置上读到上一轮的残余画面
+            
+            # 给图像帧、TF、OCR 一点缓冲时间
             rospy.loginfo("[第%d轮] 完成，等待环境稳定后进入下一轮 ...", round_idx)
             stable_until = time.monotonic() + 1.5
             while not should_stop() and time.monotonic() < stable_until:
                 # 丢弃缓冲中的旧帧
                 subscriber.get_frame()
                 rospy.sleep(0.05)
-
+    
     except Exception as e:
-        rospy.logerr("OCR 循环识别-导航异常: %s", e)
+        rospy.logerr("最后路径点任务异常: %s", e)
+        import traceback
+        rospy.logerr(traceback.format_exc())
     finally:
         subscriber.shutdown()
         if _stop_requested.is_set():
-            rospy.loginfo("循环识别-导航流程已收到停止信号，正常退出")
+            rospy.loginfo("最后路径点任务已收到停止信号，正常退出")
         elif rospy.is_shutdown():
-            rospy.loginfo("ROS 已关闭（Ctrl+C），循环识别-导航流程退出")
-        rospy.loginfo("OCR 循环识别-导航结束（共完成 %d 轮）", round_idx)
+            rospy.loginfo("ROS 已关闭（Ctrl+C），最后路径点任务退出")
+        rospy.loginfo("最后路径点任务结束（共完成 %d 轮）", round_idx)
 
 # ========== 主程序 ==========
 def main():
@@ -542,23 +690,6 @@ def main():
     # 导入小车控制
     # from TTS_RUN import move_forward, move_left, move_right,car
     from fc_point import go_to_left_waypoint, go_to_middle_waypoint, go_to_right_waypoint
-
-    # 定义动作函数
-    def move_forward_action():
-        # move_forward()
-        go_to_middle_waypoint(action_client)
-
-    def move_left_action():
-        # move_left()
-        go_to_left_waypoint(action_client)
-
-    def move_right_action():
-        # move_right()
-        go_to_right_waypoint(action_client)
-
-
-    action_functions = [move_forward_action, move_left_action, move_right_action]
-    detected_order = ["cube", "sphere", "cylinder"]  # 默认顺序
 
     # 加载模型
     rospy.loginfo("加载YOLO模型...")
@@ -573,6 +704,21 @@ def main():
         rospy.logerr("无法连接 move_base action 服务器！")
         return
     rospy.loginfo("已连接 move_base")
+
+    # 定义动作函数（需要在 action_client 创建之后）
+    def move_forward_action():
+        # move_forward()
+        go_to_middle_waypoint(action_client)
+
+    def move_left_action():
+        # move_left()
+        go_to_left_waypoint(action_client)
+
+    def move_right_action():
+        # move_right()
+        go_to_right_waypoint(action_client)
+
+    action_functions = [move_forward_action, move_left_action, move_right_action]
 
     # 路径点 (x, y, oz, ow, keep_orientation)
     waypoints = [
@@ -592,7 +738,6 @@ def main():
     ]
 
     for idx, (x, y, oz, ow, keep_ori) in enumerate(waypoints):
-        is_second_last = (idx == len(waypoints) - 2)
         is_last = (idx == len(waypoints) - 1)
 
         # 设置朝向容差
@@ -613,21 +758,10 @@ def main():
 
         rospy.loginfo("目标 %d 到达 ✓", idx+1)
 
-        # 倒数第二个点：检测物体顺序
-        if is_second_last:
-            rospy.loginfo("开始检测物体顺序...")
-            objs = capture_and_detect_objects(model)
-            if objs:
-                detected_order = [obj["label"] for obj in objs]
-                order_cn = [YOLO_TO_CHINESE.get(l, l) for l in detected_order]
-                rospy.loginfo("检测顺序（左→右）: %s", order_cn)
-            else:
-                rospy.logwarn("未检测到物体，使用默认顺序")
-
-        # 最后一个点：执行OCR识别与动作
+        # 最后一个点：执行完整流程（实时检测+建映射+循环导航）
         if is_last and success:
-            rospy.loginfo("到达最后一个路径点，启动OCR检测")
-            process_last_waypoint(model, reader, detected_order, action_functions)
+            rospy.loginfo("到达最后一个路径点，启动完整视觉任务")
+            process_last_waypoint(model, reader, action_functions)
 
     rospy.loginfo("所有路径点执行完毕。")
 
