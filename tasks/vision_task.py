@@ -33,9 +33,6 @@ def detect_objects_and_build_mapping(model, reader, subscriber, action_functions
     last_complete_order = None
     last_complete_label_to_action = None
 
-    text_detected = False
-    matched_label = None
-
     while not should_stop():
         frame = subscriber.get_frame()
         if frame is None:
@@ -73,39 +70,11 @@ def detect_objects_and_build_mapping(model, reader, subscriber, action_functions
                     rospy.loginfo("[物体检测] 当前映射关系:")
                     for ch, act in last_complete_label_to_action.items():
                         rospy.loginfo("  %s → %s", ch, act.__name__)
-
-                    if text_detected:
-                        rospy.loginfo("[映射冻结] 已识别到文字标签，检测完整，冻结映射")
-                        rospy.loginfo("[映射冻结] 最终映射关系:")
-                        for ch, act in last_complete_label_to_action.items():
-                            rospy.loginfo("  %s → %s", ch, act.__name__)
-
-                        rospy.loginfo("[动作执行] 根据识别到的文字标签执行动作: %s", matched_label)
-                        if matched_label in last_complete_label_to_action:
-                            try:
-                                last_complete_label_to_action[matched_label]()
-                                rospy.loginfo("[动作执行] 导航动作执行完成")
-                            except Exception as e:
-                                rospy.logerr("[动作执行] 导航动作异常: %s", e)
-                        else:
-                            rospy.logwarn("[动作执行] 无动作映射: %s", matched_label)
-
-                        if matched_label in TEXT_TO_SPEECH:
-                            speak_fn = TEXT_TO_SPEECH[matched_label]
-                            rospy.loginfo("[动作执行] 播报语音: %s", matched_label)
-                            for _ in range(3):
-                                if should_stop():
-                                    break
-                                speak_fn()
-                                time.sleep(1.4)
-                        else:
-                            rospy.logwarn("[动作执行] 无语音映射: %s", matched_label)
-
-                        return last_complete_order, last_complete_label_to_action
                 else:
                     rospy.loginfo("[物体检测] 检测到 %d 个物体（左→右）: %s", len(detected_order), order_cn)
-                    if text_detected:
-                        rospy.loginfo("[物体检测] 检测不完整，继续更新映射表...")
+                    if last_complete_order:
+                        rospy.loginfo("[物体检测] 检测不完整，将使用最近一次完整检测: %s",
+                                     [YOLO_TO_CHINESE.get(l, l) for l in last_complete_order])
 
         if text_boxes and (now - last_ocr_time) >= 1.5:
             best_box = text_boxes[0]
@@ -138,17 +107,46 @@ def detect_objects_and_build_mapping(model, reader, subscriber, action_functions
                         for wl_item in WHITELIST:
                             if text_similarity(consensus, wl_item) >= SIMILARITY_THRESHOLD:
                                 matched_label = wl_item
-                                text_detected = True
-                                rospy.loginfo("[OCR检测] 识别到文字标签: %s", matched_label)
+                                rospy.loginfo("[OCR检测] 匹配到物体: %s，立即冻结映射", matched_label)
+
+                                rospy.loginfo("[映射冻结] 文本标签已确认，冻结映射")
 
                                 if last_complete_order and last_complete_label_to_action:
-                                    rospy.loginfo("[映射冻结] 检测已完整，立即冻结映射")
+                                    rospy.loginfo("[映射冻结] 使用最近一次完整检测的映射")
+                                    rospy.loginfo("[映射冻结] 完整顺序（左→右）: %s",
+                                                 [YOLO_TO_CHINESE.get(l, l) for l in last_complete_order])
                                     rospy.loginfo("[映射冻结] 最终映射关系:")
                                     for ch, act in last_complete_label_to_action.items():
                                         rospy.loginfo("  %s → %s", ch, act.__name__)
                                     return last_complete_order, last_complete_label_to_action
+
+                                elif current_detected_order:
+                                    rospy.logwarn("[映射冻结] 没有完整检测记录，使用当前检测结果: %s",
+                                                 [YOLO_TO_CHINESE.get(l, l) for l in current_detected_order])
+                                    chinese_labels = [YOLO_TO_CHINESE.get(l, l) for l in current_detected_order]
+                                    label_to_action = {}
+                                    for i, ch in enumerate(chinese_labels):
+                                        if i == 0:
+                                            label_to_action[ch] = action_functions[1]
+                                        elif i == 1:
+                                            label_to_action[ch] = action_functions[0]
+                                        elif i == 2:
+                                            label_to_action[ch] = action_functions[2]
+                                    return current_detected_order, label_to_action
+
                                 else:
-                                    rospy.loginfo("[映射冻结] 检测不完整，等待完整检测后再冻结映射...")
+                                    rospy.logwarn("[映射冻结] 使用默认顺序")
+                                    default_order = ["cube", "sphere", "cylinder"]
+                                    chinese_labels = [YOLO_TO_CHINESE.get(l, l) for l in default_order]
+                                    label_to_action = {}
+                                    for i, ch in enumerate(chinese_labels):
+                                        if i == 0:
+                                            label_to_action[ch] = action_functions[1]
+                                        elif i == 1:
+                                            label_to_action[ch] = action_functions[0]
+                                        elif i == 2:
+                                            label_to_action[ch] = action_functions[2]
+                                    return default_order, label_to_action
 
         rospy.sleep(0.05)
 
