@@ -9,7 +9,6 @@ docker exec -it 编号 /bin/bash
 roslaunch yahboomcar_nav yahboomcar_navigation.launch use_rviz:=false map:=map2
 
 map路径：~/yahboomcar_ws/src/yahboomcar_nav/maps/
-
 cp -r /root/temp/\* ~/yahboomcar_ws/src/yahboomcar_nav/maps/
 
 gmapping建图
@@ -30,3 +29,11 @@ e16553ebf884
 36082cc3b06a
 
 docker exec -it 36082cc3b06a /bin/bash
+
+# 主程序启动（在docker容器内运行）
+cd /root/smartcar
+python main.py
+
+# 停止程序（方式一：Ctrl+C）
+# 停止程序（方式二：发送ROS话题）
+rostopic pub /stop_loop std_msgs/Bool "data: true"
