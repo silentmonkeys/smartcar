@@ -107,52 +107,46 @@ def detect_objects_and_build_mapping(model, reader, subscriber, action_functions
                         for wl_item in WHITELIST:
                             if text_similarity(consensus, wl_item) >= SIMILARITY_THRESHOLD:
                                 matched_label = wl_item
-                                rospy.loginfo("[OCR检测] 匹配到物体: %s，等待3秒确认...", matched_label)
-                                last_text_time = now
+                                rospy.loginfo("[OCR检测] 匹配到物体: %s，立即冻结映射", matched_label)
 
-                                while not should_stop():
-                                    if time.monotonic() - last_text_time >= 3.0:
-                                        rospy.loginfo("[映射冻结] 文本标签已确认，冻结映射")
+                                rospy.loginfo("[映射冻结] 文本标签已确认，冻结映射")
 
-                                        if last_complete_order and last_complete_label_to_action:
-                                            rospy.loginfo("[映射冻结] 使用最近一次完整检测的映射")
-                                            rospy.loginfo("[映射冻结] 完整顺序（左→右）: %s",
-                                                         [YOLO_TO_CHINESE.get(l, l) for l in last_complete_order])
-                                            rospy.loginfo("[映射冻结] 最终映射关系:")
-                                            for ch, act in last_complete_label_to_action.items():
-                                                rospy.loginfo("  %s → %s", ch, act.__name__)
-                                            return last_complete_order, last_complete_label_to_action
+                                if last_complete_order and last_complete_label_to_action:
+                                    rospy.loginfo("[映射冻结] 使用最近一次完整检测的映射")
+                                    rospy.loginfo("[映射冻结] 完整顺序（左→右）: %s",
+                                                 [YOLO_TO_CHINESE.get(l, l) for l in last_complete_order])
+                                    rospy.loginfo("[映射冻结] 最终映射关系:")
+                                    for ch, act in last_complete_label_to_action.items():
+                                        rospy.loginfo("  %s → %s", ch, act.__name__)
+                                    return last_complete_order, last_complete_label_to_action
 
-                                        elif current_detected_order:
-                                            rospy.logwarn("[映射冻结] 没有完整检测记录，使用当前检测结果: %s",
-                                                         [YOLO_TO_CHINESE.get(l, l) for l in current_detected_order])
-                                            chinese_labels = [YOLO_TO_CHINESE.get(l, l) for l in current_detected_order]
-                                            label_to_action = {}
-                                            for i, ch in enumerate(chinese_labels):
-                                                if i == 0:
-                                                    label_to_action[ch] = action_functions[1]
-                                                elif i == 1:
-                                                    label_to_action[ch] = action_functions[0]
-                                                elif i == 2:
-                                                    label_to_action[ch] = action_functions[2]
-                                            return current_detected_order, label_to_action
+                                elif current_detected_order:
+                                    rospy.logwarn("[映射冻结] 没有完整检测记录，使用当前检测结果: %s",
+                                                 [YOLO_TO_CHINESE.get(l, l) for l in current_detected_order])
+                                    chinese_labels = [YOLO_TO_CHINESE.get(l, l) for l in current_detected_order]
+                                    label_to_action = {}
+                                    for i, ch in enumerate(chinese_labels):
+                                        if i == 0:
+                                            label_to_action[ch] = action_functions[1]
+                                        elif i == 1:
+                                            label_to_action[ch] = action_functions[0]
+                                        elif i == 2:
+                                            label_to_action[ch] = action_functions[2]
+                                    return current_detected_order, label_to_action
 
-                                        else:
-                                            rospy.logwarn("[映射冻结] 使用默认顺序")
-                                            default_order = ["cube", "sphere", "cylinder"]
-                                            chinese_labels = [YOLO_TO_CHINESE.get(l, l) for l in default_order]
-                                            label_to_action = {}
-                                            for i, ch in enumerate(chinese_labels):
-                                                if i == 0:
-                                                    label_to_action[ch] = action_functions[1]
-                                                elif i == 1:
-                                                    label_to_action[ch] = action_functions[0]
-                                                elif i == 2:
-                                                    label_to_action[ch] = action_functions[2]
-                                            return default_order, label_to_action
-
-                                    rospy.sleep(0.1)
-                                break
+                                else:
+                                    rospy.logwarn("[映射冻结] 使用默认顺序")
+                                    default_order = ["cube", "sphere", "cylinder"]
+                                    chinese_labels = [YOLO_TO_CHINESE.get(l, l) for l in default_order]
+                                    label_to_action = {}
+                                    for i, ch in enumerate(chinese_labels):
+                                        if i == 0:
+                                            label_to_action[ch] = action_functions[1]
+                                        elif i == 1:
+                                            label_to_action[ch] = action_functions[0]
+                                        elif i == 2:
+                                            label_to_action[ch] = action_functions[2]
+                                    return default_order, label_to_action
 
         rospy.sleep(0.05)
 
@@ -189,7 +183,6 @@ def process_last_waypoint(model, reader, action_functions):
             ocr_history = []
             last_ocr_time = 0.0
             last_detection_box = None
-            last_text_time = time.monotonic()
             has_executed = False
             matched_label = None
 
@@ -233,36 +226,34 @@ def process_last_waypoint(model, reader, action_functions):
                                 for wl_item in WHITELIST:
                                     if text_similarity(consensus, wl_item) >= SIMILARITY_THRESHOLD:
                                         matched_label = wl_item
-                                        rospy.loginfo("[第%d轮] 匹配到物体: %s，3秒无新文本后执行",
+                                        rospy.loginfo("[第%d轮] 匹配到物体: %s，立即执行动作",
                                                       round_idx, matched_label)
-                                        last_text_time = now
                                         break
 
                 if matched_label and not has_executed:
-                    if now - last_text_time >= 3.0:
-                        rospy.loginfo("[第%d轮] 3秒无新文本，执行动作: %s", round_idx, matched_label)
-                        if matched_label in label_to_action:
-                            try:
-                                label_to_action[matched_label]()
-                                rospy.loginfo("[第%d轮] 导航动作执行完成", round_idx)
-                            except Exception as e:
-                                rospy.logerr("[第%d轮] 导航动作异常: %s", round_idx, e)
-                        else:
-                            rospy.logwarn("[第%d轮] 无动作映射: %s", round_idx, matched_label)
+                    rospy.loginfo("[第%d轮] 执行动作: %s", round_idx, matched_label)
+                    if matched_label in label_to_action:
+                        try:
+                            label_to_action[matched_label]()
+                            rospy.loginfo("[第%d轮] 导航动作执行完成", round_idx)
+                        except Exception as e:
+                            rospy.logerr("[第%d轮] 导航动作异常: %s", round_idx, e)
+                    else:
+                        rospy.logwarn("[第%d轮] 无动作映射: %s", round_idx, matched_label)
 
-                        if matched_label in TEXT_TO_SPEECH:
-                            speak_fn = TEXT_TO_SPEECH[matched_label]
-                            rospy.loginfo("[第%d轮] 播报语音: %s", round_idx, matched_label)
-                            for _ in range(3):
-                                if should_stop():
-                                    break
-                                speak_fn()
-                                time.sleep(1.4)
-                        else:
-                            rospy.logwarn("[第%d轮] 无语音映射: %s", round_idx, matched_label)
+                    if matched_label in TEXT_TO_SPEECH:
+                        speak_fn = TEXT_TO_SPEECH[matched_label]
+                        rospy.loginfo("[第%d轮] 播报语音: %s", round_idx, matched_label)
+                        for _ in range(3):
+                            if should_stop():
+                                break
+                            speak_fn()
+                            time.sleep(1.4)
+                    else:
+                        rospy.logwarn("[第%d轮] 无语音映射: %s", round_idx, matched_label)
 
-                        has_executed = True
-                        break
+                    has_executed = True
+                    break
 
                 rospy.sleep(0.05)
 
