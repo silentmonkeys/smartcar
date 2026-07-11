@@ -61,6 +61,7 @@ from geometry_msgs.msg import PoseStamped
 from move_base_msgs.msg import MoveBaseAction, MoveBaseGoal
 from dynamic_reconfigure.client import Client as DynClient
 from sensor_msgs.msg import Image
+from std_msgs.msg import Bool
 from cv_bridge import CvBridge
 
 # ========== 参数配置 ==========
@@ -105,6 +106,28 @@ TEXT_TO_SPEECH = {
 _tf_listener = None
 _current_yaw_tol = None
 _tf_lock = threading.Lock()
+
+# ========== 循环停止标志（Ctrl+C 与 /stop_loop topic 双通道）==========
+_stop_requested = threading.Event()
+_stop_sub = None
+STOP_LOOP_TOPIC = "/stop_loop"
+
+def _stop_loop_callback(msg):
+    """订阅 /stop_loop (std_msgs/Bool)，收到 data=True 即请求停止循环"""
+    if bool(msg.data):
+        rospy.logwarn("收到 %s 停止信号，准备退出循环识别-导航流程", STOP_LOOP_TOPIC)
+        _stop_requested.set()
+
+def init_stop_subscriber():
+    """初始化 /stop_loop 订阅器（仅一次）"""
+    global _stop_sub
+    if _stop_sub is None:
+        _stop_sub = rospy.Subscriber(STOP_LOOP_TOPIC, Bool, _stop_loop_callback, queue_size=1)
+        rospy.loginfo("已订阅停止话题: %s (发送 std_msgs/Bool data:true 可停止循环)", STOP_LOOP_TOPIC)
+
+def should_stop():
+    """循环退出条件：Ctrl+C 关闭 ROS 或 /stop_loop 收到 True"""
+    return rospy.is_shutdown() or _stop_requested.is_set()
 
 # ========== 图像订阅器（线程安全优化）==========
 class ROSImageSubscriber:
@@ -360,8 +383,17 @@ def capture_and_detect_objects(model):
 
 def process_last_waypoint(model, reader, detected_order, action_functions):
     """
-    最后一个路径点任务：持续进行YOLO+OCR检测，
-    当识别到白名单物体并稳定3秒后，执行对应动作并播报语音。
+    最后一个路径点任务：循环执行 [实时 OCR 识别 → 导航到对应点位 → 语音播报]，
+    直到 Ctrl+C 关闭 ROS 或 /stop_loop topic 收到 True 才停止。
+
+    每一轮：
+      1) 持续 YOLO 找文本框 + EasyOCR 识别 + 多帧共识；
+      2) 共识文本与白名单匹配后，等待 3 秒无新文本以确认稳定；
+      3) 调用对应动作函数（go_to_xxx_waypoint），即导航到对应点位；
+      4) 播报语音（×3）；
+      5) 重置 OCR 状态，进入下一轮（继续在新位置上识别）。
+
+    识别失败（未匹配到白名单）时持续等待，不退出本轮 —— 行为与首次识别一致。
     """
     # 根据检测顺序创建位置→动作的映射
     # 假设 detected_order 是 [最左边物体, 中间物体, 最右边物体]
@@ -380,100 +412,128 @@ def process_last_waypoint(model, reader, detected_order, action_functions):
     for ch, act in label_to_action.items():
         rospy.loginfo(f"  {ch} → {act.__name__}")
 
+    # 初始化停止订阅器（双通道：Ctrl+C + /stop_loop）
+    init_stop_subscriber()
+
     subscriber = ROSImageSubscriber()
     rospy.sleep(0.5)  # 等待订阅就绪
 
-    ocr_history = []
-    last_ocr_time = 0.0
-    last_detection_box = None
-    last_text_time = time.monotonic()
-    has_executed = False
-    matched_label = None
-
-    rospy.loginfo("开始实时OCR检测循环")
+    round_idx = 0
     try:
-        while not rospy.is_shutdown():
-            frame = subscriber.get_frame()
-            if frame is None:
-                rospy.sleep(0.05)
-                continue
+        while not should_stop():
+            round_idx += 1
+            rospy.loginfo("====== 第 %d 轮 OCR 识别-导航循环开始 ======", round_idx)
 
-            results = model.predict(frame, verbose=False)
-            text_boxes = detect_boxes(results[0], target_labels=[TEXT_CLASS_NAME.lower()],
-                                      min_confidence=OCR_MIN_CONFIDENCE)
-            now = time.monotonic()
+            # 每轮重置 OCR 状态
+            ocr_history = []
+            last_ocr_time = 0.0
+            last_detection_box = None
+            last_text_time = time.monotonic()
+            has_executed = False
+            matched_label = None
 
-            if text_boxes and (now - last_ocr_time) >= 1.5:
-                best_box = text_boxes[0]
-                # 判断文本框是否移动，避免重复OCR
-                do_ocr = True
-                if last_detection_box is not None:
-                    cx = (best_box["box"][0] + best_box["box"][2]) / 2
-                    cy = (best_box["box"][1] + best_box["box"][3]) / 2
-                    lx = (last_detection_box[0] + last_detection_box[2]) / 2
-                    ly = (last_detection_box[1] + last_detection_box[3]) / 2
-                    if ((cx - lx)**2 + (cy - ly)**2)**0.5 < BOX_CHANGE_THRESHOLD:
-                        do_ocr = False
+            # —— 内层：实时 OCR 识别循环 ——
+            while not should_stop():
+                frame = subscriber.get_frame()
+                if frame is None:
+                    rospy.sleep(0.05)
+                    continue
 
-                if do_ocr:
-                    last_detection_box = best_box["box"]
-                    crop, _ = crop_with_padding(frame, best_box["box"])
-                    texts = recognize_text(reader, crop)
-                    last_ocr_time = now
-                    if texts:
-                        texts.sort(key=lambda x: x[1], reverse=True)
-                        current_text = " ".join([t[0] for t in texts])
-                        current_conf = texts[0][1]
-                        ocr_history.append((current_text, current_conf))
-                        if len(ocr_history) > RESULT_HISTORY_SIZE:
-                            ocr_history.pop(0)
+                results = model.predict(frame, verbose=False)
+                text_boxes = detect_boxes(results[0], target_labels=[TEXT_CLASS_NAME.lower()],
+                                          min_confidence=OCR_MIN_CONFIDENCE)
+                now = time.monotonic()
 
-                        consensus = get_consensus_result(ocr_history)
-                        if consensus:
-                            rospy.loginfo("OCR共识文本: %s", consensus)
-                            # 匹配白名单
-                            for wl_item in WHITELIST:
-                                if text_similarity(consensus, wl_item) >= SIMILARITY_THRESHOLD:
-                                    matched_label = wl_item
-                                    rospy.loginfo("匹配到物体: %s，对应动作将在3秒无文本后执行", matched_label)
-                                    last_text_time = now
+                if text_boxes and (now - last_ocr_time) >= 1.5:
+                    best_box = text_boxes[0]
+                    # 判断文本框是否移动，避免重复OCR
+                    do_ocr = True
+                    if last_detection_box is not None:
+                        cx = (best_box["box"][0] + best_box["box"][2]) / 2
+                        cy = (best_box["box"][1] + best_box["box"][3]) / 2
+                        lx = (last_detection_box[0] + last_detection_box[2]) / 2
+                        ly = (last_detection_box[1] + last_detection_box[3]) / 2
+                        if ((cx - lx)**2 + (cy - ly)**2)**0.5 < BOX_CHANGE_THRESHOLD:
+                            do_ocr = False
+
+                    if do_ocr:
+                        last_detection_box = best_box["box"]
+                        crop, _ = crop_with_padding(frame, best_box["box"])
+                        texts = recognize_text(reader, crop)
+                        last_ocr_time = now
+                        if texts:
+                            texts.sort(key=lambda x: x[1], reverse=True)
+                            current_text = " ".join([t[0] for t in texts])
+                            current_conf = texts[0][1]
+                            ocr_history.append((current_text, current_conf))
+                            if len(ocr_history) > RESULT_HISTORY_SIZE:
+                                ocr_history.pop(0)
+
+                            consensus = get_consensus_result(ocr_history)
+                            if consensus:
+                                rospy.loginfo("[第%d轮] OCR共识文本: %s", round_idx, consensus)
+                                # 匹配白名单
+                                for wl_item in WHITELIST:
+                                    if text_similarity(consensus, wl_item) >= SIMILARITY_THRESHOLD:
+                                        matched_label = wl_item
+                                        rospy.loginfo("[第%d轮] 匹配到物体: %s，3秒无新文本后执行",
+                                                      round_idx, matched_label)
+                                        last_text_time = now
+                                        break
+
+                # 执行动作逻辑（每轮只执行一次，执行完后跳出内层循环进入下一轮）
+                if matched_label and not has_executed:
+                    if now - last_text_time >= 3.0:
+                        rospy.loginfo("[第%d轮] 3秒无新文本，执行动作: %s", round_idx, matched_label)
+                        # 1) 动作（导航到对应点位）
+                        if matched_label in label_to_action:
+                            try:
+                                label_to_action[matched_label]()
+                                rospy.loginfo("[第%d轮] 导航动作执行完成", round_idx)
+                            except Exception as e:
+                                rospy.logerr("[第%d轮] 导航动作异常: %s", round_idx, e)
+                        else:
+                            rospy.logwarn("[第%d轮] 无动作映射: %s", round_idx, matched_label)
+
+                        # 2) 语音播报（与动作解耦）
+                        if matched_label in TEXT_TO_SPEECH:
+                            speak_fn = TEXT_TO_SPEECH[matched_label]
+                            rospy.loginfo("[第%d轮] 播报语音: %s", round_idx, matched_label)
+                            for _ in range(3):
+                                if should_stop():
                                     break
+                                speak_fn()
+                                time.sleep(1.4)
+                        else:
+                            rospy.logwarn("[第%d轮] 无语音映射: %s", round_idx, matched_label)
 
-            # 执行动作逻辑
-            if matched_label and not has_executed:
-                if now - last_text_time >= 3.0:
-                    rospy.loginfo("3秒无新文本，执行动作: %s", matched_label)
-                    # 1) 动作
-                    if matched_label in label_to_action:
-                        label_to_action[matched_label]()
-                        rospy.loginfo("动作执行完成")
-                    else:
-                        rospy.logwarn("无动作映射: %s", matched_label)
+                        has_executed = True
+                        # 跳出内层循环，进入下一轮（在新位置继续识别）
+                        break
 
-                    # 2) 语音播报（与动作解耦）
-                    if matched_label in TEXT_TO_SPEECH:
-                        speak_fn = TEXT_TO_SPEECH[matched_label]
-                        rospy.loginfo("播报语音: %s", matched_label)
-                        for _ in range(3):
-                            speak_fn()
-                            time.sleep(1.4)
-                    else:
-                        rospy.logwarn("无语音映射: %s", matched_label)
+                rospy.sleep(0.05)
 
-                    has_executed = True
-                    break
-
-            # 超时保护
-            if not matched_label and (now - last_ocr_time) > 15.0 and ocr_history:
-                rospy.logwarn("长时间未匹配目标，退出检测")
+            # —— 内层结束：本轮已执行动作或被停止 ——
+            if should_stop():
                 break
 
-            rospy.sleep(0.05)
+            # 给图像帧、TF、OCR 一点缓冲时间，避免在新位置上读到上一轮的残余画面
+            rospy.loginfo("[第%d轮] 完成，等待环境稳定后进入下一轮 ...", round_idx)
+            stable_until = time.monotonic() + 1.5
+            while not should_stop() and time.monotonic() < stable_until:
+                # 丢弃缓冲中的旧帧
+                subscriber.get_frame()
+                rospy.sleep(0.05)
+
     except Exception as e:
-        rospy.logerr("OCR循环异常: %s", e)
+        rospy.logerr("OCR 循环识别-导航异常: %s", e)
     finally:
         subscriber.shutdown()
-        rospy.loginfo("OCR检测结束")
+        if _stop_requested.is_set():
+            rospy.loginfo("循环识别-导航流程已收到停止信号，正常退出")
+        elif rospy.is_shutdown():
+            rospy.loginfo("ROS 已关闭（Ctrl+C），循环识别-导航流程退出")
+        rospy.loginfo("OCR 循环识别-导航结束（共完成 %d 轮）", round_idx)
 
 # ========== 主程序 ==========
 def main():
