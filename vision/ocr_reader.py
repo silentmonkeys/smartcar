@@ -51,7 +51,7 @@ def recognize_text(reader, crop):
 
 
 def detect_and_recognize_text(reader, frame, text_boxes, last_detection_box=None,
-                              last_ocr_time=None, stable_retry_interval=5.0):
+                              last_ocr_time=None, stable_retry_interval=1.0):
     if not text_boxes:
         return None, last_detection_box, False
 
