@@ -107,6 +107,16 @@ class CostmapObstacles:
         perp_x = -ny * width / 2
         perp_y = nx * width / 2
         
+        # 用边线中点指向赛道中心的向量判断偏移方向，确保障碍点偏移到赛道内侧
+        mid_x = (x1 + x2) / 2
+        mid_y = (y1 + y2) / 2
+        to_center_x = 1.6 - mid_x
+        to_center_y = 0.0 - mid_y
+        # perp方向如果与指向中心方向相反，翻转perp
+        if perp_x * to_center_x + perp_y * to_center_y < 0:
+            perp_x = -perp_x
+            perp_y = -perp_y
+        
         num_points = max(int(length / resolution), 10)
         
         new_points = []
@@ -116,7 +126,7 @@ class CostmapObstacles:
             x = x1 + dx * t
             y = y1 + dy * t
             
-            new_points.append((x - perp_x, y - perp_y, 0.0))
+            new_points.append((x + perp_x, y + perp_y, 0.0))
         
         with self.lock:
             self.obstacle_points.extend(new_points)
