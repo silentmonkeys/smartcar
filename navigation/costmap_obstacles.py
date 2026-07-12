@@ -107,6 +107,17 @@ class CostmapObstacles:
         perp_x = -ny * width / 2
         perp_y = nx * width / 2
         
+<<<<<<< HEAD
+=======
+        avg_y = (y1 + y2) / 2
+        if avg_y < 0:
+            offset_dir = -1
+            side = "下边线"
+        else:
+            offset_dir = 1
+            side = "上边线"
+        
+>>>>>>> 133ba2b449166ed3f5b46c800f6c83a16cbc979b
         num_points = max(int(length / resolution), 10)
         
         new_points = []
@@ -116,12 +127,20 @@ class CostmapObstacles:
             x = x1 + dx * t
             y = y1 + dy * t
             
+<<<<<<< HEAD
             new_points.append((x - perp_x, y - perp_y, 0.0))
+=======
+            new_points.append((x + perp_x * offset_dir, y + perp_y * offset_dir, 0.0))
+>>>>>>> 133ba2b449166ed3f5b46c800f6c83a16cbc979b
         
         with self.lock:
             self.obstacle_points.extend(new_points)
         
+<<<<<<< HEAD
         rospy.loginfo(f"[Costmap障碍物] 添加边线: ({x1:.2f},{y1:.2f}) -> ({x2:.2f},{y2:.2f}), 点数: {len(new_points)}")
+=======
+        rospy.loginfo(f"[Costmap障碍物] 添加{side}: ({x1:.2f},{y1:.2f}) -> ({x2:.2f},{y2:.2f}), 点数: {len(new_points)}")
+>>>>>>> 133ba2b449166ed3f5b46c800f6c83a16cbc979b
     
     def _create_pointcloud(self):
         with self.lock:
