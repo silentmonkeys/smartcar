@@ -1,14 +1,18 @@
 #!/usr/bin/env python3
 import rospy
 import actionlib
+import sys
 from move_base_msgs.msg import MoveBaseAction
 from utils.opencv_utils import ensure_opencv_runtime
-from config.constants import YAW_TOL_HIGH, YAW_TOL_LOW
+from config.constants import YAW_TOL_HIGH, YAW_TOL_LOW, VIRTUAL_BOUNDARIES, VIRTUAL_BOUNDARIES_TOPIC
 from vision.yolo_detector import load_model
 from vision.ocr_reader import create_ocr_reader
 from navigation.tf_utils import get_current_yaw
 from navigation.yaw_controller import set_yaw_tolerance
 from navigation.goal_sender import send_goal
+from navigation.obstacle_publisher import VirtualLinePublisher, create_virtual_boundaries
+from navigation.costmap_obstacles import CostmapObstacles
+from navigation.map_drawer import MapDrawer
 from tasks.vision_task import process_last_waypoint
 
 
@@ -17,6 +21,8 @@ ensure_opencv_runtime()
 
 def main():
     rospy.init_node('waypoint_publisher_with_vision', anonymous=True)
+
+    use_draw_mode = '--draw' in sys.argv
 
     from fc_point import go_to_left_waypoint, go_to_middle_waypoint, go_to_right_waypoint
 
@@ -31,6 +37,54 @@ def main():
         rospy.logerr("无法连接 move_base action 服务器！")
         return
     rospy.loginfo("已连接 move_base")
+
+    rospy.loginfo("初始化虚拟边线发布器...")
+    costmap_obstacles = CostmapObstacles()
+
+    if use_draw_mode:
+        rospy.loginfo("=== 启用交互式绘制模式 ===")
+        rospy.loginfo("请在另一个终端运行绘制工具:")
+        rospy.loginfo("  python draw_tool.py")
+        rospy.loginfo("使用 'line x1 y1 x2 y2' 命令绘制边线")
+        rospy.loginfo("按 Enter 键结束绘制并开始导航")
+        
+        obstacle_publisher = VirtualLinePublisher(topic_name=VIRTUAL_BOUNDARIES_TOPIC)
+        drawer = MapDrawer(obstacle_publisher, topic_name='/draw_point')
+        
+        rospy.loginfo("等待用户绘制边线...")
+        
+        try:
+            import termios
+            import tty
+            fd = sys.stdin.fileno()
+            old_settings = termios.tcgetattr(fd)
+            tty.setcbreak(fd)
+            while not rospy.is_shutdown():
+                if sys.stdin.read(1) == '\n':
+                    break
+                rospy.sleep(0.1)
+            termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+        except ImportError:
+            import time
+            rospy.loginfo("(Windows环境: 等待5秒自动开始)")
+            time.sleep(5)
+        
+        rospy.loginfo(f"绘制完成，共 {len(drawer.get_lines())} 条边线")
+        
+        for line in drawer.get_lines():
+            x1, y1, x2, y2 = line
+            costmap_obstacles.add_line(x1, y1, x2, y2, width=0.3)
+        
+        costmap_obstacles.start()
+        obstacle_publisher.start()
+        
+        drawer.save_lines_to_config('config/virtual_boundaries.py')
+    else:
+        for line in VIRTUAL_BOUNDARIES:
+            x1, y1, x2, y2, width = line
+            costmap_obstacles.add_line(x1, y1, x2, y2, width=width)
+        
+        costmap_obstacles.start()
 
     def move_forward_action():
         go_to_middle_waypoint(action_client)
@@ -83,6 +137,9 @@ def main():
             rospy.loginfo("到达最后一个路径点，启动完整视觉任务")
             process_last_waypoint(model, reader, action_functions)
 
+    costmap_obstacles.stop()
+    if use_draw_mode:
+        obstacle_publisher.stop()
     rospy.loginfo("所有路径点执行完毕。")
 
 
