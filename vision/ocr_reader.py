@@ -1,3 +1,5 @@
+import time
+
 import cv2
 import easyocr
 from config.constants import OCR_LANGS, CONFIDENCE_THRESHOLD, RESULT_HISTORY_SIZE, BOX_CHANGE_THRESHOLD
@@ -48,9 +50,10 @@ def recognize_text(reader, crop):
     return texts
 
 
-def detect_and_recognize_text(reader, frame, text_boxes, last_detection_box=None):
+def detect_and_recognize_text(reader, frame, text_boxes, last_detection_box=None,
+                              last_ocr_time=None, stable_retry_interval=5.0):
     if not text_boxes:
-        return None, None, None
+        return None, last_detection_box, False
 
     best_box = text_boxes[0]
 
@@ -61,7 +64,9 @@ def detect_and_recognize_text(reader, frame, text_boxes, last_detection_box=None
         lx = (last_detection_box[0] + last_detection_box[2]) / 2
         ly = (last_detection_box[1] + last_detection_box[3]) / 2
         if ((cx - lx)**2 + (cy - ly)**2)**0.5 < BOX_CHANGE_THRESHOLD:
-            do_ocr = False
+            if last_ocr_time is None or (stable_retry_interval is not None and
+                                         (time.monotonic() - last_ocr_time) < stable_retry_interval):
+                do_ocr = False
 
     if do_ocr:
         last_detection_box = best_box["box"]

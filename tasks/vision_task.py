@@ -10,7 +10,7 @@ from utils.stop_signal import init_stop_subscriber, should_stop
 from utils.text_utils import text_similarity, get_consensus_result
 from vision.image_subscriber import ROSImageSubscriber
 from vision.yolo_detector import detect_objects, detect_text_boxes
-from vision.ocr_reader import crop_with_padding, recognize_text
+from vision.ocr_reader import detect_and_recognize_text
 
 
 TEXT_TO_SPEECH = {
@@ -77,76 +77,70 @@ def detect_objects_and_build_mapping(model, reader, subscriber, action_functions
                                      [YOLO_TO_CHINESE.get(l, l) for l in last_complete_order])
 
         if text_boxes and (now - last_ocr_time) >= 1.5:
-            best_box = text_boxes[0]
-            do_ocr = True
-            if last_detection_box is not None:
-                cx = (best_box["box"][0] + best_box["box"][2]) / 2
-                cy = (best_box["box"][1] + best_box["box"][3]) / 2
-                lx = (last_detection_box[0] + last_detection_box[2]) / 2
-                ly = (last_detection_box[1] + last_detection_box[3]) / 2
-                if ((cx - lx)**2 + (cy - ly)**2)**0.5 < BOX_CHANGE_THRESHOLD:
-                    do_ocr = False
-
-            if do_ocr:
-                last_detection_box = best_box["box"]
-                crop, _ = crop_with_padding(frame, best_box["box"])
-                texts = recognize_text(reader, crop)
+            texts, last_detection_box, did_ocr = detect_and_recognize_text(
+                reader,
+                frame,
+                text_boxes,
+                last_detection_box=last_detection_box,
+                last_ocr_time=last_ocr_time,
+            )
+            if did_ocr:
                 last_ocr_time = now
 
-                if texts:
-                    texts.sort(key=lambda x: x[1], reverse=True)
-                    current_text = " ".join([t[0] for t in texts])
-                    current_conf = texts[0][1]
-                    ocr_history.append((current_text, current_conf))
-                    if len(ocr_history) > RESULT_HISTORY_SIZE:
-                        ocr_history.pop(0)
+            if texts:
+                texts.sort(key=lambda x: x[1], reverse=True)
+                current_text = " ".join([t[0] for t in texts])
+                current_conf = texts[0][1]
+                ocr_history.append((current_text, current_conf))
+                if len(ocr_history) > RESULT_HISTORY_SIZE:
+                    ocr_history.pop(0)
 
-                    consensus = get_consensus_result(ocr_history)
-                    if consensus:
-                        rospy.loginfo("[OCR检测] 共识文本: %s", consensus)
-                        for wl_item in WHITELIST:
-                            if text_similarity(consensus, wl_item) >= SIMILARITY_THRESHOLD:
-                                matched_label = wl_item
-                                rospy.loginfo("[OCR检测] 匹配到物体: %s，立即冻结映射", matched_label)
+                consensus = get_consensus_result(ocr_history)
+                if consensus:
+                    rospy.loginfo("[OCR检测] 共识文本: %s", consensus)
+                    for wl_item in WHITELIST:
+                        if text_similarity(consensus, wl_item) >= SIMILARITY_THRESHOLD:
+                            matched_label = wl_item
+                            rospy.loginfo("[OCR检测] 匹配到物体: %s，立即冻结映射", matched_label)
 
-                                rospy.loginfo("[映射冻结] 文本标签已确认，冻结映射")
+                            rospy.loginfo("[映射冻结] 文本标签已确认，冻结映射")
 
-                                if last_complete_order and last_complete_label_to_action:
-                                    rospy.loginfo("[映射冻结] 使用最近一次完整检测的映射")
-                                    rospy.loginfo("[映射冻结] 完整顺序（左→右）: %s",
-                                                 [YOLO_TO_CHINESE.get(l, l) for l in last_complete_order])
-                                    rospy.loginfo("[映射冻结] 最终映射关系:")
-                                    for ch, act in last_complete_label_to_action.items():
-                                        rospy.loginfo("  %s → %s", ch, act.__name__)
-                                    return last_complete_order, last_complete_label_to_action
+                            if last_complete_order and last_complete_label_to_action:
+                                rospy.loginfo("[映射冻结] 使用最近一次完整检测的映射")
+                                rospy.loginfo("[映射冻结] 完整顺序（左→右）: %s",
+                                             [YOLO_TO_CHINESE.get(l, l) for l in last_complete_order])
+                                rospy.loginfo("[映射冻结] 最终映射关系:")
+                                for ch, act in last_complete_label_to_action.items():
+                                    rospy.loginfo("  %s → %s", ch, act.__name__)
+                                return last_complete_order, last_complete_label_to_action
 
-                                elif current_detected_order:
-                                    rospy.logwarn("[映射冻结] 没有完整检测记录，使用当前检测结果: %s",
-                                                 [YOLO_TO_CHINESE.get(l, l) for l in current_detected_order])
-                                    chinese_labels = [YOLO_TO_CHINESE.get(l, l) for l in current_detected_order]
-                                    label_to_action = {}
-                                    for i, ch in enumerate(chinese_labels):
-                                        if i == 0:
-                                            label_to_action[ch] = action_functions[1]
-                                        elif i == 1:
-                                            label_to_action[ch] = action_functions[0]
-                                        elif i == 2:
-                                            label_to_action[ch] = action_functions[2]
-                                    return current_detected_order, label_to_action
+                            elif current_detected_order:
+                                rospy.logwarn("[映射冻结] 没有完整检测记录，使用当前检测结果: %s",
+                                             [YOLO_TO_CHINESE.get(l, l) for l in current_detected_order])
+                                chinese_labels = [YOLO_TO_CHINESE.get(l, l) for l in current_detected_order]
+                                label_to_action = {}
+                                for i, ch in enumerate(chinese_labels):
+                                    if i == 0:
+                                        label_to_action[ch] = action_functions[1]
+                                    elif i == 1:
+                                        label_to_action[ch] = action_functions[0]
+                                    elif i == 2:
+                                        label_to_action[ch] = action_functions[2]
+                                return current_detected_order, label_to_action
 
-                                else:
-                                    rospy.logwarn("[映射冻结] 使用默认顺序")
-                                    default_order = ["cube", "sphere", "cylinder"]
-                                    chinese_labels = [YOLO_TO_CHINESE.get(l, l) for l in default_order]
-                                    label_to_action = {}
-                                    for i, ch in enumerate(chinese_labels):
-                                        if i == 0:
-                                            label_to_action[ch] = action_functions[1]
-                                        elif i == 1:
-                                            label_to_action[ch] = action_functions[0]
-                                        elif i == 2:
-                                            label_to_action[ch] = action_functions[2]
-                                    return default_order, label_to_action
+                            else:
+                                rospy.logwarn("[映射冻结] 使用默认顺序")
+                                default_order = ["cube", "sphere", "cylinder"]
+                                chinese_labels = [YOLO_TO_CHINESE.get(l, l) for l in default_order]
+                                label_to_action = {}
+                                for i, ch in enumerate(chinese_labels):
+                                    if i == 0:
+                                        label_to_action[ch] = action_functions[1]
+                                    elif i == 1:
+                                        label_to_action[ch] = action_functions[0]
+                                    elif i == 2:
+                                        label_to_action[ch] = action_functions[2]
+                                return default_order, label_to_action
 
         rospy.sleep(0.05)
 
@@ -197,38 +191,32 @@ def process_last_waypoint(model, reader, action_functions):
                 now = time.monotonic()
 
                 if text_boxes and (now - last_ocr_time) >= 1.5:
-                    best_box = text_boxes[0]
-                    do_ocr = True
-                    if last_detection_box is not None:
-                        cx = (best_box["box"][0] + best_box["box"][2]) / 2
-                        cy = (best_box["box"][1] + best_box["box"][3]) / 2
-                        lx = (last_detection_box[0] + last_detection_box[2]) / 2
-                        ly = (last_detection_box[1] + last_detection_box[3]) / 2
-                        if ((cx - lx)**2 + (cy - ly)**2)**0.5 < BOX_CHANGE_THRESHOLD:
-                            do_ocr = False
-
-                    if do_ocr:
-                        last_detection_box = best_box["box"]
-                        crop, _ = crop_with_padding(frame, best_box["box"])
-                        texts = recognize_text(reader, crop)
+                    texts, last_detection_box, did_ocr = detect_and_recognize_text(
+                        reader,
+                        frame,
+                        text_boxes,
+                        last_detection_box=last_detection_box,
+                        last_ocr_time=last_ocr_time,
+                    )
+                    if did_ocr:
                         last_ocr_time = now
-                        if texts:
-                            texts.sort(key=lambda x: x[1], reverse=True)
-                            current_text = " ".join([t[0] for t in texts])
-                            current_conf = texts[0][1]
-                            ocr_history.append((current_text, current_conf))
-                            if len(ocr_history) > RESULT_HISTORY_SIZE:
-                                ocr_history.pop(0)
+                    if texts:
+                        texts.sort(key=lambda x: x[1], reverse=True)
+                        current_text = " ".join([t[0] for t in texts])
+                        current_conf = texts[0][1]
+                        ocr_history.append((current_text, current_conf))
+                        if len(ocr_history) > RESULT_HISTORY_SIZE:
+                            ocr_history.pop(0)
 
-                            consensus = get_consensus_result(ocr_history)
-                            if consensus:
-                                rospy.loginfo("[第%d轮] OCR共识文本: %s", round_idx, consensus)
-                                for wl_item in WHITELIST:
-                                    if text_similarity(consensus, wl_item) >= SIMILARITY_THRESHOLD:
-                                        matched_label = wl_item
-                                        rospy.loginfo("[第%d轮] 匹配到物体: %s，立即执行动作",
-                                                      round_idx, matched_label)
-                                        break
+                        consensus = get_consensus_result(ocr_history)
+                        if consensus:
+                            rospy.loginfo("[第%d轮] OCR共识文本: %s", round_idx, consensus)
+                            for wl_item in WHITELIST:
+                                if text_similarity(consensus, wl_item) >= SIMILARITY_THRESHOLD:
+                                    matched_label = wl_item
+                                    rospy.loginfo("[第%d轮] 匹配到物体: %s，立即执行动作",
+                                                  round_idx, matched_label)
+                                    break
 
                 if matched_label and not has_executed:
                     rospy.loginfo("[第%d轮] 执行动作: %s", round_idx, matched_label)
