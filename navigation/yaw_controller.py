@@ -1,4 +1,5 @@
 from dynamic_reconfigure.client import Client as DynClient
+import rospy
 
 
 _current_yaw_tol = None
