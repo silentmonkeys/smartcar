@@ -45,10 +45,12 @@ def play_mp3(mp3_file):
         print(f"文件不存在：{mp3_file}")
         return False
 
-    set_volume(100)
+    set_volume(100)  # 先确保硬件音量最大
 
     ffmpeg_proc = subprocess.Popen(
-        ["ffmpeg", "-y", "-i", mp3_file, "-acodec", "pcm_s16le",
+        ["ffmpeg", "-y", "-i", mp3_file,
+         "-af", "volume=15dB",        # 增加音量，可尝试 5~20dB
+         "-acodec", "pcm_s16le",
          "-ar", "44100", "-ac", "2", "-f", "s16le", "-"],
         stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
     aplay_proc = subprocess.Popen(
@@ -59,7 +61,6 @@ def play_mp3(mp3_file):
     aplay_proc.wait()
     print("播放完成", flush=True)
     return True
-
 
 if __name__ == "__main__":
     play_mp3("/root/smartcar/voice/cube.mp3")
