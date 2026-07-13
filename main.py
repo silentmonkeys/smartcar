@@ -73,7 +73,7 @@ def main():
         
         for line in drawer.get_lines():
             x1, y1, x2, y2 = line
-            costmap_obstacles.add_line(x1, y1, x2, y2, width=0.3)
+            costmap_obstacles.add_line(x1, y1, x2, y2, width=0.1)
         
         costmap_obstacles.start()
         obstacle_publisher.start()
@@ -109,8 +109,8 @@ def main():
         (1.8631, 0.5052, -0.7167, 0.6974, False),
         (1.8290, 0.0106, -0.0118, 0.9999, False),
         (1.8290, 0.0106, 0.0029, 0.9999, True),
-        (2.5226, 0.0001, -0.0008, 0.9999, True),
-        (3.1629, 0.0001, 0.0001, 0.9999, True)
+        (2.5226, -0.08, -0.0008, 0.9999, True),
+        (3.1629, -0.08, 0.0001, 0.9999, True)
     ]
 
     for idx, (x, y, oz, ow, keep_ori) in enumerate(waypoints):
